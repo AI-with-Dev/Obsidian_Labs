@@ -11,17 +11,9 @@ from backend.app.main import app
 from backend.app.routers.auth import require_authenticated_owner
 
 
-_LEGACY_AUTHENTICATED_MODULES = {
-    "test_extraction",
-    "test_review_confirmation",
-    "test_review_confirm",
-    "test_upload",
-}
-
-
 @pytest.fixture(autouse=True)
 def authenticate_existing_api_workflows(request):
-    if request.module.__name__.rsplit(".", 1)[-1] not in _LEGACY_AUTHENTICATED_MODULES:
+    if request.module.__name__.rsplit(".", 1)[-1] == "test_auth":
         yield
         return
 

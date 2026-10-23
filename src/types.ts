@@ -31,11 +31,11 @@ export interface Receipt {
 }
 
 export interface Summary {
-  totalReceived: number // Primary metric: money received
-  totalSpent?: number // Backwards compatibility alias
+  totalSpent: number
+  totalReceived?: number
   confirmedCount: number
   reviewCount: number
-  topVendors: { vendor: string; amount: number }[] // Top paying customers
+  topVendors: { vendor: string; amount: number }[]
   topCustomers?: { customer: string; amount: number }[]
 }
 

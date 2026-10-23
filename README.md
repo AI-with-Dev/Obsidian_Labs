@@ -43,7 +43,7 @@ The app pairs an accessible, Claude-built React + TypeScript frontend (supportin
 ├── src/                            # Claude-built React frontend (Source of Truth)
 │   ├── App.tsx                     # Main application layout, components & routes
 │   ├── api.ts                      # Network client layer
-├── account.tsx                 # Signup/login and account settings
+│   ├── account.tsx                 # Signup/login and account settings
 │   ├── i18n.tsx                    # Bilingual provider & currency/date formatters
 │   ├── index.css                   # Tailwind v4 import & typography
 │   ├── main.tsx                    # Entrypoint
@@ -145,19 +145,70 @@ Receipt, dashboard, and export endpoints require an authenticated owner session.
 
 ---
 
-## Build Order & Project Governance
+## Testing & Verification
 
-Development strictly follows an incremental 12-step approval workflow. Each step requires explicit user sign-off before proceeding:
+Run the full automated pytest suite covering database transactions, schema migrations, file uploads, Gemini structured parsing, validation, duplicate matching, dashboard aggregations, question answering, formula-safe CSV export, and synthetic test fixtures:
 
-0. **Frontend Audit and Project Plan** *(Completed)*
-1. **Backend Foundation** *(FastAPI, SQLite schema, response envelope, dev proxy)*
-2. **Upload Service** *(File validation, SHA-256 hash, storage, upload UI connection)*
-3. **Gemini Extraction** *(Structured JSON prompt, Pydantic validation, error handling)*
-4. **Review & Confirmation** *(Editable form APIs, validation, explicit confirmation)*
-5. **Ledger** *(Confirmed receipts list, search/filtering, detail view)*
-6. **Duplicate Detection** *(SHA-256 exact match, similar purchase match, comparison UI)*
-7. **Dashboard** *(Backend-calculated metrics, category sums, clickable evidence)*
-8. **Question Answering** *(5 supported intents, safe dispatcher, natural phrasing)*
-9. **CSV Export** *(Backend CSV generation, formula-injection protection, download)*
-10. **Hindi UI & Accessibility** *(Bilingual verification, high-contrast, tap targets)*
-11. **Demo Readiness** *(20 synthetic receipts, full journey verification, final walkthrough)*
+```bash
+# Run all 40 automated tests
+PYTHONPATH=. backend/.venv/bin/pytest backend/tests
+```
+
+### Reset / Seed Demo Data
+To reset the development database to realistic stationery shop expenses at any time:
+```bash
+backend/.venv/bin/python3 backend/scripts/seed_demo_data.py
+```
+
+### Synthetic Test Dataset (20 Real-World Fixtures)
+Located in `backend/data/test_fixtures/` with complete `ground_truth.json`:
+- **8 Clear Invoices**: `fixture_01_clear.png` to `fixture_08_clear.png` (Classmate notebooks, Reynolds pens, JK Copier A4 paper, Kangaro staplers, etc.)
+- **4 Wholesale PDFs**: `fixture_09_pdf.pdf` to `fixture_12_pdf.pdf` (Navneet Publications, Kokuyo Camlin, Pidilite, Freight Carriers)
+- **3 Blurry / Ambiguous Invoices**: `fixture_13_blurry.png` (faint thermal print), `fixture_14_blurry.png` (ambiguous date), `fixture_15_blurry.png` (faint vendor banner)
+- **3 Duplicate Scenarios**: `fixture_16_exact_dup.png` (exact SHA-256 duplicate), `fixture_17_fuzzy_dup1.png` & `fixture_18_fuzzy_dup2.png` (same vendor, date, and amount)
+- **2 Incomplete Invoices**: `fixture_19_torn_total.png` (torn total edge), `fixture_20_missing_vendor.png` (cash memo without printed header)
+
+---
+
+## Hackathon Demo Script (3-Minute Walkthrough)
+
+1. **Dashboard Overview ([http://localhost:5173](http://localhost:5173))**:
+   - Show verified financial metrics calculated strictly on the backend: Total spent (`₹19,830.00`), Confirmed receipts (`4`), and Action required (`2`).
+   - Click on "Sharma Wholesale Traders" in top vendors to jump directly to the filtered ledger.
+2. **Bilingual Switcher**:
+   - Click the language toggle button in the header (`हिन्दी` / `English`). Notice immediate translation of all cards, metrics, and labels with zero page reload. Reload the page to demonstrate `localStorage` persistence.
+3. **Upload & Gemini Extraction**:
+   - Click **Add Receipt** and upload `backend/data/test_fixtures/fixture_02_clear.png` (JK Paper Mart).
+   - Watch the structured extraction parse the vendor, date, items, line prices, and total.
+   - Edit any line item or change category, then click **Add Receipt** to verify and confirm.
+4. **Duplicate Protection**:
+   - Re-upload the same file or `fixture_16_exact_dup.png`.
+   - The app detects the duplicate and displays a side-by-side comparison with the earlier receipt.
+   - Choose **"Discard this upload as a duplicate"** or **"Keep as a separate purchase"**.
+5. **Ledger & CSV Export**:
+   - Navigate to **My Expenses** (`#/ledger`).
+   - Filter by date range or category (`Inventory/Stock`, `Packaging`, `Utilities`).
+   - Click **Download expenses (CSV)**. Open the downloaded file to verify formula injection protection (cells starting with `=`, `+`, `-`, `@` are safely neutralized).
+6. **Natural Language Q&A**:
+   - Navigate to **Ask a question** (`#/ask`).
+   - Tap example questions: *"How much have I spent in total?"* or type *"मैंने कुल कितना खर्च किया?"*.
+   - View verified figures calculated in Python and phrased naturally with clickable supporting receipt evidence cards.
+
+---
+
+## Build Order & Project Governance (100% Complete)
+
+Development strictly adhered to the incremental 12-step approval workflow. All steps are fully completed and tested:
+
+- [x] **Step 0 — Frontend Audit & Project Plan**: Audited supplied Claude frontend; mapped state machines, routes, envelopes, and contracts.
+- [x] **Step 1 — Backend Foundation**: FastAPI app, SQLite database with WAL mode and foreign keys, standard error envelopes, Vite dev proxy.
+- [x] **Step 2 — Upload Service & Storage**: Multipart streaming, 10MB limit, SHA-256 hash generation, binary stream retrieval.
+- [x] **Step 3 — Gemini Structured Extraction**: Structured JSON prompt with `google-genai` SDK, Pydantic validation, raw extraction persistence, paise arithmetic.
+- [x] **Step 4 — Review & Confirmation**: Draft saves (`PATCH /api/receipts/{id}`), strict financial validations, explicit confirmation to immutable ledger (`POST /api/receipts/{id}/confirm`).
+- [x] **Step 5 — Ledger & Search Filtering**: Filtered queries by vendor, date range, search terms, and category (`GET /api/receipts`).
+- [x] **Step 6 — Duplicate Detection & Schema Integration**: Exact SHA-256 file matching, fuzzy financial matching, side-by-side comparison, discard/keep actions.
+- [x] **Step 7 — Dashboard Aggregations**: Backend-calculated confirmed metrics (`totalSpent`, `confirmedCount`, `reviewCount`, `topVendors`), category breakdown, evidence links.
+- [x] **Step 8 — Safe Question Answering**: Fixed safe query dispatcher for 5 supported intents, application calculations, Gemini natural language phrasing, safe fallbacks.
+- [x] **Step 9 — Formula-Safe CSV Export**: Server-side CSV streaming with formula injection protection (escaped `=`, `+`, `-`, `@`), RFC 4180 compliance.
+- [x] **Step 10 — Bilingual Interface, Accessibility & Polish**: 100% key parity (145 keys in `en.json` and `hi.json`), persistent language toggle, 48px mobile touch targets, double-submit protection.
+- [x] **Step 11 — Demo Readiness & Test Dataset**: 20 synthetic fixtures with `ground_truth.json`, seed data script, full end-to-end journey verification, 40/40 tests passing.

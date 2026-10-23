@@ -1,7 +1,5 @@
 import logging
 from contextlib import asynccontextmanager
-import csv
-import io
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -114,10 +112,15 @@ async def health_check():
 # Routers
 from backend.app.routers.receipts import router as receipts_router
 from backend.app.routers.dashboard import router as dashboard_router
+from backend.app.routers.questions import router as questions_router
+
+from backend.app.routers.export import router as export_router
 
 app.include_router(auth_router)
 app.include_router(receipts_router)
 app.include_router(dashboard_router)
+app.include_router(questions_router)
+app.include_router(export_router)
 
 
 from fastapi.responses import Response
@@ -181,39 +184,3 @@ async def export_payments_pdf():
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=shopledger-payment-summary.pdf"},
         )
-
-
-@app.get("/api/export/csv", dependencies=[Depends(require_authenticated_owner)])
-async def export_payments_csv():
-    with get_db() as conn:
-        rows = conn.execute(
-            """
-            SELECT vendor, receipt_date, category, currency, total_paise, status
-            FROM receipts
-            WHERE status = 'confirmed'
-            ORDER BY receipt_date DESC, created_at DESC;
-            """
-        ).fetchall()
-
-    stream = io.StringIO(newline="")
-    writer = csv.writer(stream)
-    writer.writerow(["Customer / payer", "Date", "Category", "Currency", "Amount", "Status"])
-    for row in rows:
-        values = [
-            row["vendor"] or "",
-            row["receipt_date"] or "",
-            row["category"] or "",
-            row["currency"] or "INR",
-            f"{(row['total_paise'] or 0) / 100:.2f}",
-            row["status"],
-        ]
-        writer.writerow([
-            f"'{value}" if isinstance(value, str) and value.startswith(("=", "+", "-", "@")) else value
-            for value in values
-        ])
-
-    return Response(
-        content=stream.getvalue(),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=shopledger-ledger.csv"},
-    )

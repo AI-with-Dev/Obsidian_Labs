@@ -170,4 +170,4 @@ def test_authenticated_csv_export(client):
     response = client.get("/api/export/csv")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
-    assert response.text.startswith("Customer / payer,Date,Category,Currency,Amount,Status")
+    assert response.text.startswith("Vendor,Date,Category,Currency,Total")

@@ -33,10 +33,10 @@ async def get_dashboard_summary():
 
         vendors_cursor = conn.execute(
             """
-            SELECT vendor, COALESCE(SUM(total_paise), 0) AS vendor_paise
+            SELECT TRIM(vendor) AS vendor_name, COALESCE(SUM(total_paise), 0) AS vendor_paise
             FROM receipts
-            WHERE status = 'confirmed' AND vendor != ''
-            GROUP BY vendor
+            WHERE status = 'confirmed' AND TRIM(vendor) != ''
+            GROUP BY TRIM(vendor)
             ORDER BY vendor_paise DESC
             LIMIT 5;
             """
@@ -44,7 +44,7 @@ async def get_dashboard_summary():
 
         top_vendors = [
             {
-                "vendor": row["vendor"],
+                "vendor": row["vendor_name"],
                 "amount": row["vendor_paise"] / 100.0,
             }
             for row in vendors_cursor.fetchall()
@@ -68,17 +68,17 @@ async def get_dashboard_categories():
     with get_db() as conn:
         cursor = conn.execute(
             """
-            SELECT category, COALESCE(SUM(total_paise), 0) AS category_paise
+            SELECT LOWER(TRIM(category)) AS cat_name, COALESCE(SUM(total_paise), 0) AS category_paise
             FROM receipts
-            WHERE status = 'confirmed' AND category IS NOT NULL AND category != ''
-            GROUP BY category
+            WHERE status = 'confirmed' AND category IS NOT NULL AND TRIM(category) != ''
+            GROUP BY LOWER(TRIM(category))
             ORDER BY category_paise DESC;
             """
         )
 
         categories = [
             {
-                "category": row["category"],
+                "category": row["cat_name"],
                 "amount": row["category_paise"] / 100.0,
             }
             for row in cursor.fetchall()

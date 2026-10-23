@@ -120,7 +120,7 @@ def extract_receipt_with_gemini(file_path: Path, mime_type: str) -> Tuple[Receip
     )
 
     models_to_try = [settings.GEMINI_MODEL]
-    for alt in ["gemini-3-flash-preview", "gemini-3.5-flash", "gemini-flash-latest"]:
+    for alt in ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview"]:
         if alt not in models_to_try:
             models_to_try.append(alt)
 

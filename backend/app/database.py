@@ -107,6 +107,23 @@ def get_db(db_path: str = None) -> Generator[sqlite3.Connection, None, None]:
 
 
 def init_db(db_path: str = None) -> None:
-    """Initialize database tables and indices."""
+    """Initialize database tables, indices, and migrations."""
     with get_db(db_path) as conn:
         conn.executescript(SCHEMA_SQL)
+
+        # Idempotent migrations for new receipt fields
+        receipt_cols = {row[1] for row in conn.execute("PRAGMA table_info(receipts);").fetchall()}
+        if "invoice_number" not in receipt_cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN invoice_number TEXT;")
+        if "tax_paise" not in receipt_cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN tax_paise INTEGER;")
+        if "discount_paise" not in receipt_cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN discount_paise INTEGER;")
+        if "payment_method" not in receipt_cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN payment_method TEXT;")
+        if "notes" not in receipt_cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN notes TEXT;")
+
+        item_cols = {row[1] for row in conn.execute("PRAGMA table_info(receipt_items);").fetchall()}
+        if "unit_price_paise" not in item_cols:
+            conn.execute("ALTER TABLE receipt_items ADD COLUMN unit_price_paise INTEGER;")

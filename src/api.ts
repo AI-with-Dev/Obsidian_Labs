@@ -48,7 +48,20 @@ export const changePassword=(currentPassword:string,newPassword:string,passwordC
 export const upload=(file:File)=>{const fd=new FormData();fd.append('file',file);return call<{id:string}>('/api/receipts/upload',{method:'POST',body:fd},()=>m.upload(file))}
 export const extract=(id:string)=>call<Receipt>(`/api/receipts/${id}/extract`,json('POST'),()=>m.extract(id))
 export const get=(id:string)=>call<Receipt>(`/api/receipts/${id}`,undefined,()=>m.get(id))
-export const save=(r:Receipt)=>call<Receipt>(`/api/receipts/${r.id}`,json('PATCH',{vendor:r.vendor,date:r.date,currency:r.currency,items:r.items,total:r.total,category:r.category}),()=>m.save(r))
+export const save=(r:Receipt)=>call<Receipt>(`/api/receipts/${r.id}`,json('PATCH',{
+  vendor:r.vendor,
+  date:r.date,
+  currency:r.currency,
+  items:r.items,
+  total:r.total,
+  category:r.category,
+  invoiceNumber:r.invoiceNumber,
+  subtotal:r.subtotal,
+  tax:r.tax,
+  discount:r.discount,
+  paymentMethod:r.paymentMethod,
+  notes:r.notes,
+}),()=>m.save(r))
 export const confirm=(id:string)=>call<Receipt>(`/api/receipts/${id}/confirm`,json('POST'),()=>m.confirm(id))
 export const discard=(id:string)=>call<void>(`/api/receipts/${id}/discard-duplicate`,json('POST'),()=>m.discard(id))
 export const keepSeparate=(id:string)=>call<Receipt>(`/api/receipts/${id}/keep-separate`,json('POST'),()=>m.keep(id))
