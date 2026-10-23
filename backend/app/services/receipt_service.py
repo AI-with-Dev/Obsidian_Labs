@@ -353,6 +353,11 @@ def list_receipts(
         return results
 
 ALLOWED_CONFIRM_CATEGORIES = {
+    "retail_sales",
+    "wholesale_collection",
+    "advance_payment",
+    "credit_recovery",
+    "service_fee",
     "inventory",
     "packaging",
     "transport",
