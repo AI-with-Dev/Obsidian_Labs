@@ -45,14 +45,20 @@ function UploadCloudIcon({className="w-8 h-8"}:{className?:string}){
 function XIcon({className="w-5 h-5"}:{className?:string}){
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 }
+function MenuIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+}
+function ChevronDownIcon({className="w-4 h-4"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+}
 
-// Design system tokens matching the warm cream & emerald green reference
-const btn = 'min-h-[48px] px-5 sm:px-6 rounded-2xl text-base sm:text-lg font-semibold focus-visible:outline-4 focus-visible:outline-emerald-500 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
-const primary = `${btn} bg-emerald-700 text-white hover:bg-emerald-800 shadow-sm shadow-emerald-900/10`
-const prominentBtn = `${btn} bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-700/25 text-lg font-bold py-3.5`
-const ghost = `${btn} border border-stone-300 text-stone-800 bg-white hover:bg-stone-50 hover:border-emerald-700/40 shadow-xs`
-const field = 'w-full min-h-[48px] px-3.5 sm:px-4 rounded-xl border border-stone-300 bg-white text-base text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:bg-stone-100 disabled:text-stone-500 transition-all'
-const card = 'block rounded-2xl sm:rounded-3xl bg-white border border-stone-200/90 shadow-xs hover:shadow-sm transition-all p-5 sm:p-6'
+// Design system tokens matching the warm cream & emerald green theme with crisp, sharp edges
+const btn = 'min-h-[46px] px-5 sm:px-6 rounded-xs text-base font-semibold focus-visible:outline-2 focus-visible:outline-emerald-500 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
+const primary = `${btn} bg-emerald-700 text-white hover:bg-emerald-800 shadow-2xs`
+const prominentBtn = `${btn} bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs text-base sm:text-lg font-bold py-3.5`
+const ghost = `${btn} border border-stone-300 text-stone-800 bg-white hover:bg-stone-50 hover:border-emerald-700/40 shadow-2xs`
+const field = 'w-full min-h-[46px] px-3.5 sm:px-4 rounded-xs border border-stone-300 bg-white text-base text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:bg-stone-100 disabled:text-stone-500 transition-all'
+const card = 'block rounded-xs bg-white border border-stone-200/90 shadow-2xs hover:shadow-xs transition-all p-5 sm:p-6'
 const h1 = 'text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 mb-1'
 const h2 = 'text-xl sm:text-2xl font-bold tracking-tight text-stone-900 mb-4'
 
@@ -115,7 +121,7 @@ function Badge({ s }: { s: Receipt['status'] }){
   const { t } = useI18n()
   if (s === 'confirmed') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/80 bg-emerald-50 px-3 py-1 text-xs sm:text-sm font-semibold text-emerald-800">
+      <span className="inline-flex items-center gap-1.5 rounded-xs border border-emerald-300/80 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
         <CheckCircleIcon className="w-3.5 h-3.5" />
         {t('status.confirmed')}
       </span>
@@ -123,14 +129,14 @@ function Badge({ s }: { s: Receipt['status'] }){
   }
   if (s === 'duplicate') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-300/80 bg-rose-50 px-3 py-1 text-xs sm:text-sm font-semibold text-rose-800">
+      <span className="inline-flex items-center gap-1.5 rounded-xs border border-rose-300/80 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
         <span aria-hidden className="font-bold">⚠</span>
         {t('status.duplicate')}
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-50 px-3 py-1 text-xs sm:text-sm font-semibold text-amber-800">
+    <span className="inline-flex items-center gap-1.5 rounded-xs border border-amber-300/80 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
       <ClockIcon className="w-3.5 h-3.5" />
       {t('status.draft')}
     </span>
@@ -156,7 +162,7 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
             className={`${card} flex flex-wrap items-center justify-between gap-3 hover:border-emerald-700/60 hover:shadow-md transition-all group cursor-pointer`}
           >
             <div className="flex items-center gap-3.5 min-w-[200px]">
-              <div className="w-11 h-11 rounded-2xl bg-stone-100 group-hover:bg-emerald-50 text-stone-600 group-hover:text-emerald-700 flex items-center justify-center transition-colors shrink-0">
+              <div className="w-11 h-11 rounded-xs bg-stone-100 group-hover:bg-emerald-50 text-stone-600 group-hover:text-emerald-700 flex items-center justify-center transition-colors shrink-0">
                 <ReceiptIcon className="w-5 h-5" />
               </div>
               <div>
@@ -166,7 +172,7 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
                 <div className="flex items-center flex-wrap gap-2 text-sm text-stone-500 mt-0.5">
                   <span>{r.date ? day(r.date, lang) : '—'}</span>
                   <span>•</span>
-                  <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${catColors[r.category] || catColors.other}`}>
+                  <span className={`px-2 py-0.5 rounded-xs text-xs font-medium border ${catColors[r.category] || catColors.other}`}>
                     {t('cat.' + r.category)}
                   </span>
                 </div>
@@ -174,8 +180,8 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
             </div>
             <div className="text-right flex items-center gap-3 ml-auto">
               <div>
-                <b className="block text-lg sm:text-xl font-bold text-stone-900">
-                  {r.total == null ? '—' : money(r.total, lang, r.currency)}
+                <b className={`block text-lg sm:text-xl font-bold ${r.type === 'expense' ? 'text-rose-600' : 'text-emerald-700'}`}>
+                  {r.total == null ? '—' : `${r.type === 'expense' ? '-' : '+'} ${money(r.total, lang, r.currency)}`}
                 </b>
                 <div className="mt-0.5">
                   <Badge s={r.status} />
@@ -954,14 +960,14 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
 
           {/* Key Stat Cards: 1 Prominent Dark-Green Card + 2 Smaller Cards */}
           <div className="grid gap-4 sm:grid-cols-3">
-            {/* Prominent Dark-Green Card Showing Total Spending */}
-            <div className="sm:col-span-1 rounded-2xl sm:rounded-3xl p-6 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white shadow-lg shadow-emerald-950/20 border border-emerald-800/40 flex flex-col justify-between relative overflow-hidden">
+            {/* Prominent Dark-Green Card Showing Total Received */}
+            <div className="sm:col-span-1 rounded-xs p-6 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white shadow-md shadow-emerald-950/20 border border-emerald-800/40 flex flex-col justify-between relative overflow-hidden">
               <div className="relative z-10">
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="w-10 h-10 rounded-2xl bg-emerald-800/80 border border-emerald-600/40 text-emerald-200 flex items-center justify-center">
+                  <span className="w-10 h-10 rounded-xs bg-emerald-800/80 border border-emerald-600/40 text-emerald-200 flex items-center justify-center">
                     <WalletIcon className="w-5 h-5" />
                   </span>
-                  <span className="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-800/90 text-emerald-200 border border-emerald-700/50">
+                  <span className="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-xs bg-emerald-800/90 text-emerald-200 border border-emerald-700/50">
                     {t('home.verifiedBadge')}
                   </span>
                 </div>
@@ -969,7 +975,11 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                   {t('home.spent')}
                 </p>
                 <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5">
+<<<<<<< HEAD
+                  {money(s.totalReceived ?? s.totalSpent ?? 0, lang)}
+=======
                   {money(s.totalSpent ?? s.totalReceived ?? 0, lang,currency)}
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
                 </p>
               </div>
               <div className="relative z-10 pt-4 mt-2 border-t border-emerald-800/50 flex items-center justify-between text-xs text-emerald-200/80">
@@ -987,7 +997,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200/70 flex items-center justify-center">
+                  <span className="w-10 h-10 rounded-xs bg-emerald-50 text-emerald-800 border border-emerald-200/70 flex items-center justify-center">
                     <CheckCircleIcon className="w-5 h-5" />
                   </span>
                   <ArrowRightIcon className="w-4 h-4 text-stone-400 group-hover:text-emerald-700 transition-colors" />
@@ -1008,15 +1018,15 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-800 border border-amber-200/70 flex items-center justify-center">
+                  <span className="w-10 h-10 rounded-xs bg-amber-50 text-amber-800 border border-amber-200/70 flex items-center justify-center">
                     <ClockIcon className="w-5 h-5" />
                   </span>
                   {s.reviewCount > 0 ? (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-xs bg-amber-100 text-amber-900 border border-amber-300">
                       {t('home.pendingBadge')}
                     </span>
                   ) : (
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-xs bg-emerald-100 text-emerald-800">
                       {t('home.allClear')}
                     </span>
                   )}
@@ -1036,14 +1046,14 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
             </div>
           </div>
 
-          {/* Receipts Waiting for Review Section (if any) */}
+          {/* Payments Waiting for Review Section */}
           <section id="waiting-section" className="scroll-mt-6">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className={h2}>{t('home.waiting')}</h2>
               </div>
               {p.length > 0 && (
-                <span className="text-xs sm:text-sm font-bold bg-amber-100 text-amber-900 px-3 py-1 rounded-full">
+                <span className="text-xs sm:text-sm font-bold bg-amber-100 text-amber-900 px-3 py-1 rounded-xs">
                   {p.length} {t('home.review').toLowerCase()}
                 </span>
               )}
@@ -1051,9 +1061,9 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
             {p.length ? (
               <RList rs={p} onSelect={onSelectReceipt} />
             ) : (
-              <div className={`${card} text-center py-6 text-stone-600 bg-stone-50/70`}>
+              <div className={`${card} text-center py-8 text-stone-700 bg-emerald-50/30 border border-dashed border-emerald-200`}>
                 <CheckCircleIcon className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-                <p className="text-base sm:text-lg font-medium">{t('home.none')}</p>
+                <p className="text-base sm:text-lg font-bold text-emerald-900">{t('home.none')}</p>
               </div>
             )}
           </section>
@@ -1087,7 +1097,11 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                   amount: x.amount,
                   href: `#/ledger?category=${x.category}`
                 }))}
+<<<<<<< HEAD
+                total={s.totalReceived ?? s.totalSpent ?? 0}
+=======
                 total={s.totalSpent ?? s.totalReceived ?? 0}
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
               />
             </section>
             <section>
@@ -1182,7 +1196,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
     if (ex === 'busy') return
     setEx('busy')
     try {
-      await api.exportCsv()
+      await api.exportPdf()
       setEx('ok')
     } catch {
       setEx('err')
@@ -1200,7 +1214,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
         </div>
         <button className={primary} disabled={ex === 'busy'} onClick={doExport}>
           <DownloadIcon className="w-5 h-5" />
-          <span>{t('lg.export')}</span>
+          <span>{t('lg.exportPdf')}</span>
         </button>
       </div>
 
@@ -1307,25 +1321,7 @@ function Ask({ onSelectReceipt }: { onSelectReceipt: (r: Receipt) => void }){
         <p className="text-stone-600 text-sm sm:text-base">{t('qa.help')}</p>
       </div>
 
-      {/* Example suggestion chips */}
-      <div className="space-y-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">Tap to ask</span>
-        <div className="flex flex-col gap-2">
-          {[1, 2, 3, 4, 5].map(n => (
-            <button
-              key={n}
-              className={`${ghost} text-left text-stone-700 hover:text-emerald-900 hover:border-emerald-700/60 justify-start py-3 px-4 text-sm sm:text-base`}
-              disabled={l}
-              onClick={() => go(t('qa.ex' + n))}
-            >
-              <SparklesIcon className="w-4 h-4 text-emerald-700 shrink-0" />
-              <span>{t('qa.ex' + n)}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Query input */}
+      {/* 1. User Input Box on the TOP */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <input
           className={field}
@@ -1373,6 +1369,26 @@ function Ask({ onSelectReceipt }: { onSelectReceipt: (r: Receipt) => void }){
           </div>
         )}
       </div>
+
+      {/* 2. Question Suggestions on the BOTTOM */}
+      <div className="space-y-2.5 pt-4 border-t border-stone-200/80">
+        <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+          {lang === 'hi' ? 'सुझाव (पूछने के लिए छुएँ)' : 'Suggested Questions (Tap to ask)'}
+        </span>
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3, 4, 5].map(n => (
+            <button
+              key={n}
+              className={`${ghost} text-left text-stone-700 hover:text-emerald-900 hover:border-emerald-700/60 justify-start py-3 px-4 text-sm sm:text-base`}
+              disabled={l}
+              onClick={() => go(t('qa.ex' + n))}
+            >
+              <SparklesIcon className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>{t('qa.ex' + n)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1415,6 +1431,9 @@ export default function App(){
   const [activeModal, setActiveModal] = useState<{ id?: string; file?: File } | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // Header Dropdown Menu state
+  const [menuOpen, setMenuOpen] = useState(false)
 
   // Direct route detection for #/receipt/:id
   useEffect(() => {
@@ -1518,15 +1537,20 @@ export default function App(){
       {/* Success Notification Banner / Toast */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-60 max-w-md animate-in slide-in-from-top duration-200">
-          <div className="bg-emerald-800 text-white px-5 py-3.5 rounded-2xl shadow-xl flex items-center justify-between gap-3 border border-emerald-700">
+          <div className="bg-emerald-800 text-white px-5 py-3.5 rounded-xs shadow-xl flex items-center justify-between gap-3 border border-emerald-700">
             <div className="flex items-center gap-2.5">
               <CheckCircleIcon className="w-5 h-5 text-emerald-300 shrink-0" />
               <p className="text-sm font-semibold">{toastMessage}</p>
             </div>
             <button
               onClick={() => setToastMessage(null)}
+<<<<<<< HEAD
+              className="text-emerald-200 hover:text-white p-1 cursor-pointer"
+              aria-label="Dismiss"
+=======
               className="text-emerald-200 hover:text-white p-1"
               aria-label={t('common.dismiss')}
+>>>>>>> origin/main
             >
               ✕
             </button>
@@ -1544,11 +1568,12 @@ export default function App(){
         />
       )}
 
-      {/* Top Header */}
+      {/* Top Header Bar - Only Logo is visible, with a dropdown menu trigger */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-2xs">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:py-4">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:py-3.5">
+          {/* Only Logo visible on the header */}
           <a href="#/" className="flex items-center gap-2.5 text-emerald-900 group">
-            <span className="w-10 h-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-xs group-hover:bg-emerald-800 transition-colors">
+            <span className="w-10 h-10 rounded-xs bg-emerald-700 text-white flex items-center justify-center shadow-xs group-hover:bg-emerald-800 transition-colors">
               <StoreIcon className="w-5 h-5" />
             </span>
             <div className="leading-tight">
@@ -1561,6 +1586,60 @@ export default function App(){
             </div>
           </a>
 
+<<<<<<< HEAD
+          {/* Header Dropdown Toggle Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-expanded={menuOpen}
+            aria-label={t('nav.label')}
+            className="flex items-center gap-2 px-3 py-2 rounded-xs border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 font-semibold text-sm shadow-2xs cursor-pointer transition-colors"
+          >
+            {menuOpen ? (
+              <XIcon className="w-5 h-5 text-stone-700" />
+            ) : (
+              <MenuIcon className="w-5 h-5 text-stone-700" />
+            )}
+            <ChevronDownIcon className={`w-4 h-4 text-stone-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+
+        {/* Dropdown Navigation & Quick Actions Menu */}
+        {menuOpen && (
+          <div className="border-t border-stone-200 bg-white shadow-md animate-in slide-in-from-top-1 duration-150">
+            <div className="mx-auto max-w-5xl px-4 py-3 space-y-3">
+              <nav aria-label={t('nav.label')} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {nav.map(item => {
+                  const active = path === item.p
+                  const Icon = item.icon
+                  return (
+                    <a
+                      key={item.p}
+                      href={'#' + item.p}
+                      aria-current={active ? 'page' : undefined}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-2.5 py-2.5 px-3 rounded-xs text-sm font-semibold transition-all ${
+                        active
+                          ? 'bg-emerald-50 text-emerald-900 border border-emerald-300'
+                          : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
+                      <span className="truncate">{t(item.k)}</span>
+                    </a>
+                  )
+                })}
+              </nav>
+
+              <div className="pt-2 border-t border-stone-200/80 flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    hiddenFileInputRef.current?.click()
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xs bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer"
+=======
           {/* Header Action + Language Switcher */}
           <div className="flex items-center gap-2 sm:gap-3">
             <button
@@ -1599,14 +1678,27 @@ export default function App(){
                       ? 'bg-white text-emerald-900 shadow-xs border border-stone-200/80'
                       : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
                   }`}
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
                 >
-                  <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
-                  <span className="truncate">{t(item.k)}</span>
-                </a>
-              )
-            })}
+                  <PlusIcon className="w-4 h-4" />
+                  <span>{t('home.add')}</span>
+                </button>
+
+                <button
+                  className="min-h-[38px] px-3.5 rounded-xs border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
+                  aria-label={t('lang.label')}
+                  onClick={() => {
+                    setLang(lang === 'en' ? 'hi' : 'en')
+                    setMenuOpen(false)
+                  }}
+                >
+                  <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
+                  <span>{t('lang.other')}</span>
+                </button>
+              </div>
+            </div>
           </div>
-        </nav>
+        )}
       </header>
 
       {/* Main Content View */}
