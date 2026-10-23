@@ -106,38 +106,6 @@ function State({ l, e, run, children }: { l: boolean; e?: boolean; run: () => vo
   return <>{children}</>
 }
 
-<<<<<<< HEAD
-function Home(){
-  const {t,lang}=useI18n()
-  const q=useLoad(()=>Promise.all([api.summary(),api.categories(),api.list({status:'pending'})]),[])
-  const s=q.d?.[0],c=q.d?.[1],p=q.d?.[2]
-  return <State {...q}>{s&&c&&p&&<div className="space-y-8">
-    <h1 className={h1}>{t('home.title')}</h1>
-    {s.confirmedCount===0&&<div className={card}><p className="mb-4 text-xl">{t('home.empty')}</p><a href="#/upload" className={primary}>{t('home.add')}</a></div>}
-    <div className="grid gap-4 sm:grid-cols-3">
-      <div className={card}><p>{t('home.spent')}</p><p className="text-3xl font-bold">{money(s.totalSpent,lang)}</p></div>
-      <a href="#/ledger" className={`${card} hover:border-emerald-800`}><p>{t('home.count')}</p><p className="text-3xl font-bold">{s.confirmedCount}</p></a>
-      <div className={card}><p>{t('home.review')}</p><p className="text-3xl font-bold">{s.reviewCount}</p></div>
-    </div>
-    <section><h2 className={h2}>{t('home.waiting')}</h2>{p.length?<RList rs={p}/>:<p className="text-lg">{t('home.none')}</p>}</section>
-    <section><h2 className={h2}>{t('home.cats')}</h2><Rows rows={c.map(x=>({label:t('cat.'+x.category),amount:x.amount,href:`#/ledger?category=${x.category}`}))}/></section>
-    <section><h2 className={h2}>{t('home.vendors')}</h2><Rows rows={s.topVendors.map(v=>({label:v.vendor,amount:v.amount,href:`#/ledger?vendor=${encodeURIComponent(v.vendor)}`}))}/></section>
-  </div>}</State>
-}
-
-const OK=['image/jpeg','image/png','application/pdf']
-function Upload(){
-  const {t}=useI18n()
-  const [file,setFile]=useState<File|null>(null)
-  const [st,setSt]=useState<'idle'|'up'|'read'|'done'|'err'>('idle')
-  const [msg,setMsg]=useState(''),[id,setId]=useState('')
-  const busy=st==='up'||st==='read'
-  const pick=(f?:File)=>{setFile(null);setMsg('');setSt('idle');if(!f)return;if(!OK.includes(f.type)){setMsg(t('up.badType'));setSt('err');return}setFile(f)}
-  const send=async()=>{
-    if(!file||busy)return
-    try{setSt('up');const r=await api.upload(file);setSt('read');await api.extract(r.id);setId(r.id);setSt('done')}
-    catch(e:any){setMsg(e?.message||t('up.fail'));setSt('err')}
-=======
 function Badge({ s }: { s: Receipt['status'] }){
   const { t } = useI18n()
   if (s === 'confirmed') {
@@ -147,7 +115,6 @@ function Badge({ s }: { s: Receipt['status'] }){
         {t('status.confirmed')}
       </span>
     )
->>>>>>> refs/remotes/origin/main
   }
   if (s === 'duplicate') {
     return (
