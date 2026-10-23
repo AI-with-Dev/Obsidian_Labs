@@ -2,12 +2,15 @@ import hashlib
 import json
 import re
 import uuid
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional, Tuple
 from fastapi import HTTPException, UploadFile, status
 
 from backend.app.config import settings
 from backend.app.database import get_db
+from backend.app.models import ReceiptUpdatePayload
 
 ALLOWED_MIMES = {
     "image/jpeg": ".jpg",
@@ -348,4 +351,222 @@ def list_receipts(
             return filtered
 
         return results
+
+
+ALLOWED_CONFIRM_CATEGORIES = {
+    "inventory",
+    "packaging",
+    "transport",
+    "utilities",
+    "rent",
+    "repairs",
+    "other",
+}
+
+
+def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
+    """Save owner corrections and draft edits for an existing receipt."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, status, flags_json FROM receipts WHERE id = ?;",
+            (receipt_id,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Receipt with ID '{receipt_id}' not found.",
+            )
+
+        if row["status"] == "discarded_duplicate":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot edit a discarded duplicate receipt.",
+            )
+
+        # Money conversion to integer paise
+        total_paise = None
+        if payload.total is not None:
+            try:
+                total_paise = int(round(Decimal(str(payload.total)) * 100))
+            except Exception:
+                total_paise = None
+
+        # Clean/normalize values
+        vendor = (payload.vendor or "").strip()
+        date = (payload.date or "").strip()
+        currency = (payload.currency or "INR").strip().upper()
+        category = (payload.category or "").strip().lower() if payload.category is not None else (row["category"] or "other")
+        if category and category not in ALLOWED_CONFIRM_CATEGORIES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid category '{payload.category}'. Category must be one of: {', '.join(sorted(ALLOWED_CONFIRM_CATEGORIES))}.",
+            )
+
+        # Update uncertainty flags: clear flags if user provided valid fields
+        existing_flags = set(json.loads(row["flags_json"] or "[]"))
+        if vendor:
+            existing_flags.discard("vendor")
+        if date and re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+            existing_flags.discard("date")
+        if total_paise is not None and total_paise > 0:
+            existing_flags.discard("total")
+
+        # Update receipt record
+        conn.execute(
+            """
+            UPDATE receipts
+            SET vendor = ?,
+                receipt_date = ?,
+                currency = ?,
+                total_paise = ?,
+                category = ?,
+                flags_json = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?;
+            """,
+            (
+                vendor,
+                date,
+                currency,
+                total_paise,
+                category,
+                json.dumps(list(existing_flags)),
+                receipt_id,
+            ),
+        )
+
+        # Replace items if items list was provided
+        if payload.items is not None:
+            conn.execute("DELETE FROM receipt_items WHERE receipt_id = ?;", (receipt_id,))
+            for idx, item in enumerate(payload.items):
+                try:
+                    line_paise = int(round(Decimal(str(item.amount)) * 100))
+                except Exception:
+                    line_paise = 0
+                conn.execute(
+                    """
+                    INSERT INTO receipt_items (receipt_id, item_order, description, quantity, line_total_paise)
+                    VALUES (?, ?, ?, 1.0, ?);
+                    """,
+                    (receipt_id, idx, item.name.strip() or "Item", line_paise),
+                )
+
+        # Audit log event
+        conn.execute(
+            """
+            INSERT INTO receipt_events (receipt_id, event_type, details_json)
+            VALUES (?, 'EDITED', ?);
+            """,
+            (
+                receipt_id,
+                json.dumps({
+                    "vendor": vendor,
+                    "date": date,
+                    "currency": currency,
+                    "total": payload.total,
+                    "category": category,
+                    "items_count": len(payload.items) if payload.items is not None else None,
+                }),
+            ),
+        )
+
+    return get_receipt_details(receipt_id)
+
+
+def confirm_receipt(receipt_id: str) -> dict:
+    """Validate and explicitly confirm receipt into the trusted ledger."""
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT id, vendor, receipt_date, currency, total_paise, category, status
+            FROM receipts
+            WHERE id = ?;
+            """,
+            (receipt_id,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Receipt with ID '{receipt_id}' not found.",
+            )
+
+        if row["status"] == "discarded_duplicate":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot confirm a discarded duplicate receipt.",
+            )
+
+        if row["status"] == "confirmed":
+            # Already confirmed, idempotent return
+            return get_receipt_details(receipt_id)
+
+        # Strict validations: nonempty vendor, valid ISO date, currency INR, positive total, allowed category
+        errors = []
+
+        vendor = (row["vendor"] or "").strip()
+        if not vendor:
+            errors.append("Vendor name is required.")
+
+        receipt_date = (row["receipt_date"] or "").strip()
+        if not receipt_date:
+            errors.append("Receipt date is required.")
+        else:
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", receipt_date):
+                errors.append("Receipt date must be in YYYY-MM-DD format.")
+            else:
+                try:
+                    datetime.strptime(receipt_date, "%Y-%m-%d")
+                except ValueError:
+                    errors.append("Receipt date is not a valid calendar date.")
+
+        currency = (row["currency"] or "").strip().upper()
+        if currency != "INR":
+            errors.append("Currency must be INR.")
+
+        total_paise = row["total_paise"]
+        if total_paise is None or total_paise <= 0:
+            errors.append("Receipt total must be a positive amount.")
+
+        category = (row["category"] or "").strip().lower()
+        if category not in ALLOWED_CONFIRM_CATEGORIES:
+            errors.append(f"Category must be one of: {', '.join(sorted(ALLOWED_CONFIRM_CATEGORIES))}.")
+
+        if errors:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot confirm receipt: " + " ".join(errors),
+            )
+
+        # Transition to confirmed status
+        conn.execute(
+            """
+            UPDATE receipts
+            SET status = 'confirmed',
+                confirmed_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP,
+                flags_json = '[]'
+            WHERE id = ?;
+            """,
+            (receipt_id,),
+        )
+
+        conn.execute(
+            """
+            INSERT INTO receipt_events (receipt_id, event_type, details_json)
+            VALUES (?, 'CONFIRMED', ?);
+            """,
+            (
+                receipt_id,
+                json.dumps({
+                    "vendor": vendor,
+                    "receipt_date": receipt_date,
+                    "total_paise": total_paise,
+                    "category": category,
+                }),
+            ),
+        )
+
+    return get_receipt_details(receipt_id)
 

@@ -78,7 +78,7 @@ function Upload(){
   const send=async()=>{
     if(!file||busy)return
     try{setSt('up');const r=await api.upload(file);setSt('read');await api.extract(r.id);setId(r.id);setSt('done')}
-    catch{setMsg(t('up.fail'));setSt('err')}
+    catch(e:any){setMsg(e?.message||t('up.fail'));setSt('err')}
   }
   return <div className="space-y-6 max-w-2xl">
     <h1 className={h1}>{t('up.title')}</h1>

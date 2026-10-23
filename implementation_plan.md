@@ -330,12 +330,12 @@ We will curate 20 synthetic receipt fixtures covering all edge cases, paired wit
 
 | Step | Title | Scope & Deliverables | Approval Gate Status |
 | :---: | :--- | :--- | :---: |
-| **Step 0** | **Frontend Audit & Project Plan** | Audit supplied frontend; produce `frontend_integration_audit.md`, `implementation_plan.md`, `task_list.md`, `README.md`, `.env.example`; verify folder structure and contracts. | **CURRENT AUTHORIZED STEP** |
-| **Step 1** | **Backend Foundation** | FastAPI app, SQLite database setup, schema migration, config/env handling, CORS, response envelopes, and dev-server proxy connection. | *Awaiting Step 0 Approval* |
-| **Step 2** | **Upload Service** | File upload endpoint, SHA-256 hashing, MIME validation, file storage, and upload UI connection. | *Awaiting Prior Step* |
-| **Step 3** | **Gemini Extraction** | Gemini structured prompt, Pydantic schema validation, raw response persistence, error handling, review screen connection. | *Awaiting Prior Step* |
-| **Step 4** | **Review & Confirmation** | Editable review form API, validation checks, explicit confirmation action moving record to trusted ledger. | *Awaiting Prior Step* |
-| **Step 5** | **Ledger** | Confirmed receipt listing, filtering by date/category/vendor, search by text, detailed read-only view. | *Awaiting Prior Step* |
+| **Step 0** | **Frontend Audit & Project Plan** | Audit supplied frontend; produce `frontend_integration_audit.md`, `implementation_plan.md`, `task_list.md`, `README.md`, `.env.example`; verify folder structure and contracts. | **COMPLETED** |
+| **Step 1** | **Backend Foundation** | FastAPI app, SQLite database setup, schema migration, config/env handling, CORS, response envelopes, and dev-server proxy connection. | **COMPLETED** |
+| **Step 2** | **Upload Service** | File upload endpoint, SHA-256 hashing, MIME validation, file storage, and upload UI connection. | **COMPLETED** |
+| **Step 3** | **Gemini Extraction** | Gemini structured prompt, Pydantic schema validation, raw response persistence, error handling, review screen connection. | **COMPLETED** |
+| **Step 4** | **Review & Confirmation** | Editable review form API, validation checks, explicit confirmation action moving record to trusted ledger. | **COMPLETED** |
+| **Step 5** | **Ledger** | Confirmed receipt listing, filtering by date/category/vendor, search by text, detailed read-only view. | *Awaiting Initiation & Approval* |
 | **Step 6** | **Duplicate Detection** | Exact hash and fuzzy match engine, side-by-side duplicate comparison UI, discard/keep actions. | *Awaiting Prior Step* |
 | **Step 7** | **Dashboard** | Backend-calculated financial summaries, category breakdown, top vendors, clickable receipt evidence links. | *Awaiting Prior Step* |
 | **Step 8** | **Question Answering** | Safe query dispatcher for 5 supported intents, Python calculations, Gemini language phrasing, unsupported fallback. | *Awaiting Prior Step* |

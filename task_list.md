@@ -11,8 +11,9 @@ This task list tracks the execution of each authorized step for **ShopLedger**. 
   - **Step 1 — Backend Foundation** [x]
   - **Step 2 — Upload Service & Storage** [x]
   - **Step 3 — Gemini Structured Extraction Service** [x]
-- **Current Authorized Step**: **Step 4 — Review & Confirmation Workflow (IN PROGRESS)**
-- **Overall Progress**: 3 / 12 Steps Completed; Step 4 In Progress
+  - **Step 4 — Review & Confirmation Workflow** [x]
+- **Current Authorized Step**: **Step 5 — Ledger & Search Filtering (Awaiting Initiation & Approval)**
+- **Overall Progress**: 4 / 12 Steps Completed; Step 5 Next
 
 ---
 
@@ -77,16 +78,17 @@ This task list tracks the execution of each authorized step for **ShopLedger**. 
 
 ---
 
-### Step 4: Review & Confirmation Workflow (CURRENT AUTHORIZED STEP - IN PROGRESS)
-- [/] Define Pydantic schema for receipt edits (`ReceiptUpdate`, `ItemUpdate`).
-- [/] Implement `save_receipt_draft(id, payload)` in `receipt_service.py`.
-- [/] Implement `confirm_receipt(id)` with strict validation in `receipt_service.py`.
-- [/] Implement `PATCH /api/receipts/{id}` endpoint in `routers/receipts.py`.
-- [/] Implement `POST /api/receipts/{id}/confirm` endpoint in `routers/receipts.py`.
-- [/] Transition confirmed receipts to status `confirmed` with `confirmed_at` timestamp.
-- [/] Log audit events (`EDITED`, `CONFIRMED`) in `receipt_events`.
-- [/] Add automated pytest tests for review, editing, validation, and confirmation.
-- [ ] Stop and present Step 4 results for review.
+### Step 4: Review & Confirmation Workflow (COMPLETED)
+- [x] Present Step 4 Scope, File Impact, API Contracts, Validation Rules, and UI States.
+- [x] Receive explicit approval ("Approved. Proceed.") before implementing code.
+- [x] Implement `save_receipt_draft(id, payload)` in `receipt_service.py` to persist edits (`PATCH /api/receipts/{id}`).
+- [x] Implement `confirm_receipt(id)` with strict financial validations in `receipt_service.py` (`POST /api/receipts/{id}/confirm`).
+- [x] Implement `PATCH /api/receipts/{id}` and `POST /api/receipts/{id}/confirm` in `routers/receipts.py`.
+- [x] Transition confirmed receipts to status `confirmed` with `confirmed_at` timestamp.
+- [x] Log audit events (`EDITED`, `CONFIRMED`) in `receipt_events`.
+- [x] Add automated pytest tests for review, editing, validation, and confirmation (`tests/test_review_confirmation.py` - 3/3 passed).
+- [x] Verify live review screen interaction (save draft, validation error, confirm, read-only lock).
+- [x] Stop and present Step 4 results for review.
 
 ---
 

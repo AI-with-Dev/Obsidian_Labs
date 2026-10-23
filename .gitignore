@@ -4,6 +4,8 @@ dist/
 
 # Python virtual environment & cache
 venv/
+.venv/
+backend/.venv/
 __pycache__/
 *.pyc
 .pytest_cache/

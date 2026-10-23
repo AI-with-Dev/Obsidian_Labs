@@ -68,10 +68,10 @@ CRITICAL RULES:
 
 def get_gemini_client() -> genai.Client:
     """Return an initialized Google GenAI client."""
-    if not settings.GEMINI_API_KEY:
+    if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY in {"your_gemini_api_key_here", "your_key_here"}:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API key is not configured on the backend.",
+            detail="Gemini API key is not configured in .env. Please set a valid GEMINI_API_KEY.",
         )
     return genai.Client(api_key=settings.GEMINI_API_KEY)
 
@@ -119,14 +119,20 @@ def extract_receipt_with_gemini(file_path: Path, mime_type: str) -> Tuple[Receip
         temperature=0.0,
     )
 
+    models_to_try = [settings.GEMINI_MODEL]
+    for alt in ["gemini-3-flash-preview", "gemini-3.5-flash", "gemini-flash-latest"]:
+        if alt not in models_to_try:
+            models_to_try.append(alt)
+
     max_retries = 3
     last_error = None
 
     for attempt in range(max_retries):
+        model_name = models_to_try[attempt % len(models_to_try)]
         try:
-            logger.info("Calling Gemini extraction (attempt %d/%d) on %s", attempt + 1, max_retries, file_path.name)
+            logger.info("Calling Gemini extraction (attempt %d/%d, model %s) on %s", attempt + 1, max_retries, model_name, file_path.name)
             response = client.models.generate_content(
-                model=settings.GEMINI_MODEL,
+                model=model_name,
                 contents=[
                     file_part,
                     "Extract the vendor, date, line items, total, and suggested category from this receipt.",
@@ -165,14 +171,26 @@ def extract_receipt_with_gemini(file_path: Path, mime_type: str) -> Tuple[Receip
 
         except Exception as e:
             last_error = e
-            logger.warning("Gemini attempt %d failed: %s", attempt + 1, e)
+            err_str = str(e)
+            logger.warning("Gemini attempt %d (model %s) failed: %s", attempt + 1, model_name, e)
+            if "API_KEY_INVALID" in err_str or "API key not valid" in err_str:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Invalid Gemini API key. Please check your GEMINI_API_KEY in .env.",
+                )
             if attempt < max_retries - 1:
-                time.sleep(1.5 * (attempt + 1))
+                time.sleep(2.0 * (attempt + 1))
             else:
                 break
+
+    err_str = str(last_error)
+    if "503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str:
+        user_message = "The receipt extraction service is temporarily busy due to high traffic on Google's AI servers. Please click 'Retry' in a few seconds."
+    else:
+        user_message = f"Receipt extraction service failed: {last_error}"
 
     logger.error("All Gemini extraction attempts failed: %s", last_error)
     raise HTTPException(
         status_code=status.HTTP_502_BAD_GATEWAY,
-        detail=f"Receipt extraction service failed: {last_error}",
+        detail=user_message,
     )

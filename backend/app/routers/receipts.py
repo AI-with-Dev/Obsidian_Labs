@@ -74,3 +74,24 @@ async def list_all_receipts(
     return ApiResponse.ok(data)
 
 
+from backend.app.models import ReceiptUpdatePayload
+from backend.app.services.receipt_service import (
+    confirm_receipt,
+    save_receipt_draft,
+)
+
+
+@router.patch("/{id}", response_model=ApiResponse[dict])
+async def update_receipt(id: str, payload: ReceiptUpdatePayload):
+    """Save owner corrections and draft edits for a receipt."""
+    data = save_receipt_draft(id, payload)
+    return ApiResponse.ok(data)
+
+
+@router.post("/{id}/confirm", response_model=ApiResponse[dict])
+async def confirm_receipt_endpoint(id: str):
+    """Explicitly confirm and finalize receipt into the trusted ledger."""
+    data = confirm_receipt(id)
+    return ApiResponse.ok(data)
+
+
