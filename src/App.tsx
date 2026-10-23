@@ -1,7 +1,7 @@
-import {useCallback,useEffect,useState,ReactNode} from 'react'
+import {useCallback,useEffect,useState,useRef,ReactNode} from 'react'
 import {useI18n,money,day} from './i18n'
 import * as api from './api'
-import {CATEGORIES,Receipt,Filters,Answer} from './types'
+import {CATEGORIES,Receipt,Item,Filters,Answer} from './types'
 
 // Reusable SVG Icons for clear, simple visual guidance
 function StoreIcon({className="w-5 h-5"}:{className?:string}){
@@ -37,13 +37,16 @@ function SearchIcon({className="w-5 h-5"}:{className?:string}){
 function UploadCloudIcon({className="w-8 h-8"}:{className?:string}){
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
 }
+function XIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+}
 
 // Design system tokens matching the warm cream & emerald green reference
-const btn = 'min-h-[50px] px-5 sm:px-6 rounded-2xl text-base sm:text-lg font-semibold focus-visible:outline-4 focus-visible:outline-emerald-500 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
+const btn = 'min-h-[48px] px-5 sm:px-6 rounded-2xl text-base sm:text-lg font-semibold focus-visible:outline-4 focus-visible:outline-emerald-500 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
 const primary = `${btn} bg-emerald-700 text-white hover:bg-emerald-800 shadow-sm shadow-emerald-900/10`
 const prominentBtn = `${btn} bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-700/25 text-lg font-bold py-3.5`
 const ghost = `${btn} border border-stone-300 text-stone-800 bg-white hover:bg-stone-50 hover:border-emerald-700/40 shadow-xs`
-const field = 'w-full min-h-[50px] px-4 rounded-xl border border-stone-300 bg-white text-base sm:text-lg text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:bg-stone-100 disabled:text-stone-500 transition-all'
+const field = 'w-full min-h-[48px] px-3.5 sm:px-4 rounded-xl border border-stone-300 bg-white text-base text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:bg-stone-100 disabled:text-stone-500 transition-all'
 const card = 'block rounded-2xl sm:rounded-3xl bg-white border border-stone-200/90 shadow-xs hover:shadow-sm transition-all p-5 sm:p-6'
 const h1 = 'text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 mb-1'
 const h2 = 'text-xl sm:text-2xl font-bold tracking-tight text-stone-900 mb-4'
@@ -58,6 +61,8 @@ const catColors: Record<string, string> = {
   repairs: 'bg-rose-50 text-rose-800 border-rose-200/70',
   other: 'bg-stone-100 text-stone-700 border-stone-200/70',
 }
+
+const OK = ['image/jpeg', 'image/png', 'application/pdf']
 
 function useHash(){
   const get = () => location.hash.slice(1) || '/'
@@ -127,7 +132,7 @@ function Badge({ s }: { s: Receipt['status'] }){
   )
 }
 
-function RList({ rs }: { rs: Receipt[] }){
+function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => void }){
   const { t, lang } = useI18n()
   if (!rs.length) return (
     <div className={`${card} text-center py-8 text-stone-500`}>
@@ -139,9 +144,11 @@ function RList({ rs }: { rs: Receipt[] }){
     <ul className="space-y-3">
       {rs.map(r => (
         <li key={r.id}>
-          <a
-            href={`#/receipt/${r.id}`}
-            className={`${card} flex flex-wrap items-center justify-between gap-3 hover:border-emerald-700/60 hover:shadow-md transition-all group`}
+          <div
+            onClick={() => onSelect ? onSelect(r) : location.hash = `#/receipt/${r.id}`}
+            role="button"
+            tabIndex={0}
+            className={`${card} flex flex-wrap items-center justify-between gap-3 hover:border-emerald-700/60 hover:shadow-md transition-all group cursor-pointer`}
           >
             <div className="flex items-center gap-3.5 min-w-[200px]">
               <div className="w-11 h-11 rounded-2xl bg-stone-100 group-hover:bg-emerald-50 text-stone-600 group-hover:text-emerald-700 flex items-center justify-center transition-colors shrink-0">
@@ -173,7 +180,7 @@ function RList({ rs }: { rs: Receipt[] }){
                 <ArrowRightIcon className="w-5 h-5" />
               </div>
             </div>
-          </a>
+          </div>
         </li>
       ))}
     </ul>
@@ -236,14 +243,672 @@ function TopVendorsList({ rows }: { rows: { label: string; amount: number; href:
   )
 }
 
-function Home(){
+// -------------------------------------------------------------
+// REVIEW RECEIPT MODAL (Compact, Cream & Emerald, Structured)
+// -------------------------------------------------------------
+interface ReviewModalProps {
+  receiptId?: string | null
+  file?: File | null
+  onClose: () => void
+  onSuccess: (receipt: Receipt) => void
+}
+
+function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModalProps){
+  const { t, lang } = useI18n()
+
+  const [loading, setLoading] = useState(true)
+  const [loadingMsg, setLoadingMsg] = useState(t('up.sending'))
+  const [initError, setInitError] = useState<string | null>(null)
+
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
+  const [vendor, setVendor] = useState('')
+  const [invoiceNo, setInvoiceNo] = useState('')
+  const [date, setDate] = useState('')
+  const [category, setCategory] = useState('inventory')
+  const [paymentMethod, setPaymentMethod] = useState('Cash')
+  const [currency, setCurrency] = useState('INR')
+  const [items, setItems] = useState<Item[]>([])
+  const [tax, setTax] = useState<string>('')
+  const [discount, setDiscount] = useState<string>('')
+  const [total, setTotal] = useState<string>('')
+  const [notes, setNotes] = useState('')
+
+  const [showImage, setShowImage] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [dupResolving, setDupResolving] = useState(false)
+
+  // Populate form fields from extracted/loaded receipt
+  const populate = (r: Receipt) => {
+    setReceipt(r)
+    setVendor(r.vendor || '')
+    setInvoiceNo(r.invoiceNumber || '')
+    setDate(r.date || '')
+    setCategory(r.category || 'inventory')
+    setPaymentMethod(r.paymentMethod || 'Cash')
+    setCurrency(r.currency || 'INR')
+    setItems(r.items && r.items.length ? r.items.map(it => ({
+      name: it.name || '',
+      amount: it.amount || 0,
+      quantity: it.quantity || 1,
+      unitPrice: it.unitPrice || it.amount || 0,
+    })) : [{ name: '', amount: 0, quantity: 1, unitPrice: 0 }])
+    setTax(r.tax !== undefined && r.tax !== null ? String(r.tax) : '')
+    setDiscount(r.discount !== undefined && r.discount !== null ? String(r.discount) : '')
+    setTotal(r.total !== null && r.total !== undefined ? String(r.total) : '')
+    setNotes(r.notes || '')
+  }
+
+  // Initial fetch / OCR process
+  useEffect(() => {
+    let active = true
+
+    async function initialize() {
+      setLoading(true)
+      setInitError(null)
+
+      try {
+        if (file) {
+          setLoadingMsg(t('up.sending'))
+          const uploadRes = await api.upload(file)
+          if (!active) return
+
+          setLoadingMsg(t('up.reading'))
+          const extracted = await api.extract(uploadRes.id)
+          if (!active) return
+
+          populate(extracted)
+        } else if (receiptId) {
+          setLoadingMsg(t('common.loading'))
+          const data = await api.get(receiptId)
+          if (!active) return
+          populate(data)
+        } else {
+          setInitError('No receipt provided.')
+        }
+      } catch (err: unknown) {
+        if (!active) return
+        const msg = err instanceof Error ? err.message : t('up.fail')
+        setInitError(msg)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    initialize()
+    return () => { active = false }
+  }, [file, receiptId])
+
+  // Subtotal calculation
+  const subtotal = items.reduce((acc, it) => acc + (Number(it.amount) || 0), 0)
+
+  // Item field update with auto-calculation of line amount if qty/price edited
+  const updateItem = (index: number, patch: Partial<Item>) => {
+    setItems(prev => {
+      const copy = [...prev]
+      const current = { ...copy[index], ...patch }
+      if (patch.quantity !== undefined || patch.unitPrice !== undefined) {
+        const q = Number(current.quantity) || 1
+        const p = Number(current.unitPrice) || 0
+        if (p > 0) {
+          current.amount = Math.round(q * p * 100) / 100
+        }
+      }
+      copy[index] = current
+      return copy
+    })
+  }
+
+  const addItem = () => {
+    setItems(prev => [...prev, { name: '', amount: 0, quantity: 1, unitPrice: 0 }])
+  }
+
+  const removeItem = (index: number) => {
+    setItems(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Recalculate suggested total when items, tax, or discount change
+  const applyCalculatedTotal = () => {
+    const tVal = Number(tax) || 0
+    const dVal = Number(discount) || 0
+    const calc = Math.max(0, subtotal + tVal - dVal)
+    setTotal(String(Math.round(calc * 100) / 100))
+  }
+
+  // Handle duplicate decision: Keep as separate
+  const handleKeepSeparate = async () => {
+    if (!receipt) return
+    setDupResolving(true)
+    try {
+      const updated = await api.keepSeparate(receipt.id)
+      populate(updated)
+    } catch {
+      setSubmitError(t('common.error'))
+    } finally {
+      setDupResolving(false)
+    }
+  }
+
+  // Handle duplicate decision: Discard
+  const handleDiscardDuplicate = async () => {
+    if (!receipt) return
+    setDupResolving(true)
+    try {
+      await api.discard(receipt.id)
+      onClose()
+    } catch {
+      setSubmitError(t('common.error'))
+    } finally {
+      setDupResolving(false)
+    }
+  }
+
+  // Final Validation and Save & Confirm
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!receipt || isSubmitting) return
+
+    setSubmitError(null)
+
+    // Validation
+    const trimmedVendor = vendor.trim()
+    const trimmedDate = date.trim()
+    const numericTotal = total === '' ? null : Number(total)
+
+    if (!trimmedVendor || !trimmedDate || numericTotal === null || isNaN(numericTotal) || numericTotal < 0) {
+      setSubmitError(t('rv.validationError'))
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      // 1. Prepare finalized receipt payload using user's edited values
+      const finalized: Receipt = {
+        ...receipt,
+        vendor: trimmedVendor,
+        date: trimmedDate,
+        currency: currency || 'INR',
+        category: category || 'inventory',
+        items: items
+          .map(it => ({
+            name: it.name.trim() || 'Item',
+            amount: Number(it.amount) || 0,
+            quantity: Number(it.quantity) || 1,
+            unitPrice: Number(it.unitPrice) || Number(it.amount) || 0,
+          }))
+          .filter(it => it.name.length > 0 || it.amount > 0),
+        total: numericTotal,
+        invoiceNumber: invoiceNo.trim() || undefined,
+        subtotal,
+        tax: tax !== '' ? Number(tax) : undefined,
+        discount: discount !== '' ? Number(discount) : undefined,
+        paymentMethod: paymentMethod || undefined,
+        notes: notes.trim() || undefined,
+        status: 'confirmed',
+        flags: [],
+      }
+
+      // 2. Persist edits to database via PATCH
+      await api.save(finalized)
+
+      // 3. Confirm receipt via POST confirm
+      const confirmed = await api.confirm(receipt.id)
+
+      // 4. Success callback triggers dashboard refresh and closes modal
+      onSuccess(confirmed || finalized)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t('common.error')
+      setSubmitError(msg)
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
+      onClick={e => { if (e.target === e.currentTarget && !isSubmitting) onClose() }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-review-title"
+    >
+      <div
+        className="bg-[#FAF7F2] rounded-3xl shadow-2xl border border-stone-200/90 w-full max-w-[600px] max-h-[92vh] flex flex-col overflow-hidden relative"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-5 py-4 sm:px-6 sm:py-5 border-b border-stone-200/80 bg-white">
+          <div className="flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+              <ReceiptIcon className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 id="modal-review-title" className="text-xl sm:text-2xl font-bold text-stone-900 leading-tight">
+                {t('rv.title')}
+              </h2>
+              <p className="text-xs text-stone-500">
+                {receipt?.fileName || file?.name || 'ShopLedger'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="w-9 h-9 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-900 hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer"
+            onClick={onClose}
+            disabled={isSubmitting}
+            aria-label={t('rv.close')}
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Content */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-stone-600">
+              <div className="w-10 h-10 border-3 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+              <p className="text-lg font-semibold text-stone-800">{loadingMsg}</p>
+              <p className="text-xs text-stone-500">Extracting vendor, date, items, and total amount...</p>
+            </div>
+          ) : initError ? (
+            <div className="text-center py-8 space-y-4">
+              <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900 font-medium">
+                ⚠ {initError}
+              </div>
+              <button className={ghost} onClick={onClose}>{t('rv.close')}</button>
+            </div>
+          ) : receipt?.status === 'duplicate' ? (
+            /* Duplicate Detection Warning & Resolution */
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-rose-300 bg-rose-50/80 p-4 text-rose-950">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <span>⚠</span> {t('dp.title')}
+                </h3>
+                <p className="text-sm mt-1">{t('dp.help')}</p>
+              </div>
+
+              {receipt.fileUrl && (
+                <div className="rounded-2xl border border-stone-200 bg-white p-3 text-center">
+                  <img src={receipt.fileUrl} alt="Receipt preview" className="max-h-48 mx-auto object-contain rounded-lg" />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  className={`${ghost} text-rose-800 border-rose-300 hover:bg-rose-50`}
+                  disabled={dupResolving}
+                  onClick={handleDiscardDuplicate}
+                >
+                  {t('dp.discard')}
+                </button>
+                <button
+                  type="button"
+                  className={primary}
+                  disabled={dupResolving}
+                  onClick={handleKeepSeparate}
+                >
+                  {t('dp.keep')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form id="review-receipt-form" onSubmit={handleSubmit} className="space-y-6">
+              {/* Receipt File Preview Pill / Expand */}
+              {receipt?.fileUrl && (
+                <div className="rounded-2xl border border-stone-200 bg-white p-3.5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs text-stone-600">
+                    <span className="font-semibold flex items-center gap-1.5">
+                      <ReceiptIcon className="w-4 h-4 text-emerald-700" />
+                      {t('rv.preview')} ({receipt.fileName})
+                    </span>
+                    <button
+                      type="button"
+                      className="text-emerald-700 font-bold hover:underline cursor-pointer"
+                      onClick={() => setShowImage(!showImage)}
+                    >
+                      {showImage ? 'Hide preview ▲' : 'Show preview ▼'}
+                    </button>
+                  </div>
+                  {showImage && (
+                    <div className="pt-2 border-t border-stone-100 text-center">
+                      <img
+                        src={receipt.fileUrl}
+                        alt="Receipt preview"
+                        className="max-h-56 mx-auto object-contain rounded-xl border border-stone-200 bg-stone-50"
+                      />
+                      <a
+                        href={receipt.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block mt-2 text-xs font-semibold text-emerald-800 underline"
+                      >
+                        {t('rv.open')} ↗
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Informative Warning Notice */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs sm:text-sm text-amber-900 flex items-start gap-2">
+                <span className="text-base shrink-0">ℹ</span>
+                <span>{t('rv.warn')}</span>
+              </div>
+
+              {/* 1. RECEIPT DETAILS SECTION */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500 border-b border-stone-200 pb-1">
+                  1. {t('rv.details')}
+                </h3>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-stone-800">
+                        {t('rv.vendor')} <span className="text-rose-600">*</span>
+                      </span>
+                      <input
+                        type="text"
+                        className={field}
+                        placeholder="e.g. Sharma Traders"
+                        value={vendor}
+                        onChange={e => setVendor(e.target.value)}
+                        required
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-stone-800">
+                        {t('rv.invoiceNo')}
+                      </span>
+                      <input
+                        type="text"
+                        className={field}
+                        placeholder="e.g. INV-1049"
+                        value={invoiceNo}
+                        onChange={e => setInvoiceNo(e.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-stone-800">
+                        {t('rv.date')} <span className="text-rose-600">*</span>
+                      </span>
+                      <input
+                        type="date"
+                        className={field}
+                        value={date}
+                        onChange={e => setDate(e.target.value)}
+                        required
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-stone-800">
+                        {t('rv.category')}
+                      </span>
+                      <select
+                        className={field}
+                        value={category}
+                        onChange={e => setCategory(e.target.value)}
+                      >
+                        {CATEGORIES.map(c => (
+                          <option key={c} value={c}>
+                            {t('cat.' + c)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-stone-800">
+                        {t('rv.paymentMethod')}
+                      </span>
+                      <select
+                        className={field}
+                        value={paymentMethod}
+                        onChange={e => setPaymentMethod(e.target.value)}
+                      >
+                        <option value="Cash">{t('rv.cash')}</option>
+                        <option value="UPI">{t('rv.upi')}</option>
+                        <option value="Card">{t('rv.card')}</option>
+                        <option value="Credit">{t('rv.credit')}</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. ITEMS SECTION */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                    2. {t('rv.itemsSection')}
+                  </h3>
+                  <button
+                    type="button"
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                    onClick={addItem}
+                  >
+                    {t('rv.addItem')}
+                  </button>
+                </div>
+
+                <div className="space-y-2.5">
+                  {items.map((it, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded-xl border border-stone-200/90 shadow-2xs space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          className={`${field} flex-1`}
+                          placeholder={t('rv.item')}
+                          value={it.name}
+                          onChange={e => updateItem(idx, { name: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          className="w-9 h-9 rounded-xl text-stone-400 hover:text-rose-700 hover:bg-rose-50 flex items-center justify-center shrink-0 transition-colors"
+                          onClick={() => removeItem(idx)}
+                          aria-label={t('rv.removeItem')}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <label className="block text-stone-500 mb-0.5">{t('rv.qty')}</label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="any"
+                            min="0"
+                            className={`${field} min-h-[38px] text-sm px-2`}
+                            value={it.quantity ?? 1}
+                            onChange={e => updateItem(idx, { quantity: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-stone-500 mb-0.5">{t('rv.price')} (₹)</label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="any"
+                            min="0"
+                            className={`${field} min-h-[38px] text-sm px-2`}
+                            value={it.unitPrice ?? it.amount ?? 0}
+                            onChange={e => updateItem(idx, { unitPrice: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-stone-500 mb-0.5">{t('rv.amount')} (₹)</label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="any"
+                            min="0"
+                            className={`${field} min-h-[38px] text-sm px-2 font-bold text-stone-900`}
+                            value={it.amount}
+                            onChange={e => updateItem(idx, { amount: Number(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. AMOUNT SUMMARY SECTION */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                    3. {t('rv.summary')}
+                  </h3>
+                  <button
+                    type="button"
+                    className="text-xs text-stone-500 hover:text-stone-800 underline"
+                    onClick={applyCalculatedTotal}
+                  >
+                    Auto-fill total from items
+                  </button>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-stone-200/90 space-y-3">
+                  <div className="flex justify-between items-center text-sm text-stone-600">
+                    <span>{t('rv.subtotal')}:</span>
+                    <span className="font-semibold text-stone-800">{money(subtotal, lang, currency)}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-stone-600 mb-1">{t('rv.tax')} (₹)</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        min="0"
+                        placeholder="0.00"
+                        className={`${field} min-h-[42px] text-sm`}
+                        value={tax}
+                        onChange={e => setTax(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-stone-600 mb-1">{t('rv.discount')} (₹)</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        min="0"
+                        placeholder="0.00"
+                        className={`${field} min-h-[42px] text-sm`}
+                        value={discount}
+                        onChange={e => setDiscount(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-100">
+                    <label className="block">
+                      <span className="mb-1 flex items-center justify-between text-base font-bold text-stone-900">
+                        <span>{t('rv.total')} (₹) <span className="text-rose-600">*</span></span>
+                        <span className="text-xs font-normal text-stone-500">Required</span>
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        min="0"
+                        className={`${field} text-xl font-extrabold text-emerald-950 border-emerald-600/50 focus:border-emerald-700 bg-emerald-50/20`}
+                        placeholder="0.00"
+                        value={total}
+                        onChange={e => setTotal(e.target.value)}
+                        required
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-stone-600">{t('rv.notes')}</span>
+                      <input
+                        type="text"
+                        className={`${field} min-h-[42px] text-sm`}
+                        placeholder="Optional remarks (e.g. Paid by cashier)"
+                        value={notes}
+                        onChange={e => setNotes(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Inline Error Notice */}
+              {submitError && (
+                <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-rose-900 text-sm font-semibold flex items-center gap-2">
+                  <span>⚠</span>
+                  <span>{submitError}</span>
+                </div>
+              )}
+            </form>
+          )}
+        </div>
+
+        {/* Modal Footer / Prominent Add Receipt Button */}
+        {!loading && !initError && receipt?.status !== 'duplicate' && (
+          <div className="p-4 sm:p-5 border-t border-stone-200/80 bg-white space-y-2">
+            <button
+              type="submit"
+              form="review-receipt-form"
+              className={`${prominentBtn} w-full`}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>{t('rv.addingReceipt')}</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircleIcon className="w-5 h-5" />
+                  <span>{t('rv.addReceipt')}</span>
+                </>
+              )}
+            </button>
+            <div className="text-center">
+              <button
+                type="button"
+                className="text-xs text-stone-500 hover:text-stone-800 underline py-1"
+                disabled={isSubmitting}
+                onClick={onClose}
+              >
+                Cancel and finish later
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () => void; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
   const { t, lang } = useI18n()
   const q = useLoad(() => Promise.all([
     api.summary(),
     api.categories(),
     api.list({ status: 'pending' }),
     api.list({ status: 'confirmed' })
-  ]), [])
+  ]), [refreshKey])
   const s = q.d?.[0], c = q.d?.[1], p = q.d?.[2], confirmed = q.d?.[3]
 
   return (
@@ -263,10 +928,10 @@ function Home(){
               </p>
             </div>
             <div>
-              <a href="#/upload" className={prominentBtn}>
+              <button onClick={onAddReceipt} className={prominentBtn}>
                 <PlusIcon className="w-5 h-5" />
                 <span>{t('home.add')}</span>
-              </a>
+              </button>
             </div>
           </div>
 
@@ -275,10 +940,10 @@ function Home(){
             <div className={`${card} border-emerald-200 bg-emerald-50/40 p-6 sm:p-8 text-center max-w-xl mx-auto`}>
               <ReceiptIcon className="w-12 h-12 mx-auto text-emerald-700 mb-3" />
               <p className="mb-4 text-lg font-medium text-stone-800">{t('home.empty')}</p>
-              <a href="#/upload" className={primary}>
+              <button onClick={onAddReceipt} className={primary}>
                 <PlusIcon className="w-5 h-5" />
                 {t('home.add')}
-              </a>
+              </button>
             </div>
           )}
 
@@ -379,7 +1044,7 @@ function Home(){
               )}
             </div>
             {p.length ? (
-              <RList rs={p} />
+              <RList rs={p} onSelect={onSelectReceipt} />
             ) : (
               <div className={`${card} text-center py-6 text-stone-600 bg-stone-50/70`}>
                 <CheckCircleIcon className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
@@ -399,7 +1064,7 @@ function Home(){
               </a>
             </div>
             {confirmed && confirmed.length > 0 ? (
-              <RList rs={confirmed.slice(0, 5)} />
+              <RList rs={confirmed.slice(0, 5)} onSelect={onSelectReceipt} />
             ) : (
               <div className={`${card} text-center py-6 text-stone-500`}>
                 <p className="text-base">{t('home.empty')}</p>
@@ -437,38 +1102,18 @@ function Home(){
   )
 }
 
-const OK = ['image/jpeg', 'image/png', 'application/pdf']
-function Upload(){
+function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
   const { t } = useI18n()
-  const [file, setFile] = useState<File | null>(null)
-  const [st, setSt] = useState<'idle' | 'up' | 'read' | 'done' | 'err'>('idle')
-  const [msg, setMsg] = useState(''), [id, setId] = useState('')
-  const busy = st === 'up' || st === 'read'
+  const [dragActive, setDragActive] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  const pick = (f?: File) => {
-    setFile(null); setMsg(''); setSt('idle')
+  const handleFile = (f?: File) => {
     if (!f) return
     if (!OK.includes(f.type)) {
-      setMsg(t('up.badType'))
-      setSt('err')
+      alert(t('up.badType'))
       return
     }
-    setFile(f)
-  }
-
-  const send = async () => {
-    if (!file || busy) return
-    try {
-      setSt('up')
-      const r = await api.upload(file)
-      setSt('read')
-      await api.extract(r.id)
-      setId(r.id)
-      setSt('done')
-    } catch {
-      setMsg(t('up.fail'))
-      setSt('err')
-    }
+    onFileSelect(f)
   }
 
   return (
@@ -478,342 +1123,54 @@ function Upload(){
         <p className="text-stone-600 text-base sm:text-lg">{t('up.help')}</p>
       </div>
 
-      <div className={`${card} border-2 border-dashed border-stone-300 hover:border-emerald-600/70 p-8 text-center transition-all`}>
-        <UploadCloudIcon className="w-12 h-12 mx-auto text-emerald-700 mb-3" />
-        <label className={`${prominentBtn} cursor-pointer inline-flex`}>
+      <div
+        className={`${card} border-2 border-dashed ${dragActive ? 'border-emerald-600 bg-emerald-50/50' : 'border-stone-300'} hover:border-emerald-600/70 p-8 sm:p-12 text-center transition-all cursor-pointer`}
+        onDragOver={e => { e.preventDefault(); setDragActive(true) }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={e => {
+          e.preventDefault()
+          setDragActive(false)
+          handleFile(e.dataTransfer.files?.[0])
+        }}
+        onClick={() => inputRef.current?.click()}
+      >
+        <UploadCloudIcon className="w-14 h-14 mx-auto text-emerald-700 mb-4" />
+        <h3 className="text-xl font-bold text-stone-900 mb-2">
+          {t('up.choose')}
+        </h3>
+        <p className="text-stone-600 text-sm mb-4">
+          Click or drop bill photos, scanned copies, or PDF invoices
+        </p>
+        <button
+          type="button"
+          className={prominentBtn}
+          onClick={e => { e.stopPropagation(); inputRef.current?.click() }}
+        >
+          <PlusIcon className="w-5 h-5" />
           <span>{t('up.choose')}</span>
-          <input
-            type="file"
-            accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-            className="sr-only"
-            disabled={busy}
-            onChange={e => pick(e.target.files?.[0])}
-          />
-        </label>
-        <p className="text-xs text-stone-500 mt-3">JPG, PNG, PDF up to 10MB</p>
-      </div>
-
-      {file && (
-        <div className={`${card} flex items-center justify-between gap-3 bg-emerald-50/40 border-emerald-200`}>
-          <div className="flex items-center gap-3">
-            <ReceiptIcon className="w-6 h-6 text-emerald-800 shrink-0" />
-            <div>
-              <span className="block text-xs font-semibold uppercase tracking-wider text-emerald-800">{t('up.selected')}</span>
-              <b className="break-all text-base sm:text-lg text-stone-900">{file.name}</b>
-            </div>
-          </div>
-          {!busy && st !== 'done' && (
-            <button className="text-stone-400 hover:text-stone-700 text-lg px-2" onClick={() => setFile(null)}>✕</button>
-          )}
-        </div>
-      )}
-
-      <div role="status" aria-live="polite">
-        {busy && (
-          <div className={`${card} p-5 space-y-3 bg-stone-50`}>
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
-              <p className="text-base sm:text-lg font-medium text-stone-800">
-                {st === 'up' && t('up.sending')}
-                {st === 'read' && t('up.reading')}
-              </p>
-            </div>
-            <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
-              <div className="bg-emerald-600 h-2 rounded-full animate-pulse w-3/4" />
-            </div>
-          </div>
-        )}
-        {st === 'done' && (
-          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 font-semibold flex items-center gap-2">
-            <CheckCircleIcon className="w-5 h-5 text-emerald-700" />
-            <span>{t('up.done')}</span>
-          </div>
-        )}
-        {st === 'err' && (
-          <p role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900 font-medium">
-            ⚠ {msg}
-          </p>
-        )}
-      </div>
-
-      {st === 'done' ? (
-        <a href={`#/receipt/${id}`} className={`${prominentBtn} w-full`}>
-          <span>{t('up.next')}</span>
-          <ArrowRightIcon className="w-5 h-5" />
-        </a>
-      ) : (
-        <button className={`${primary} w-full py-3.5`} disabled={!file || busy} onClick={send}>
-          {st === 'err' && file ? t('common.retry') : t('up.send')}
         </button>
-      )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+          className="sr-only"
+          onChange={e => handleFile(e.target.files?.[0])}
+        />
+        <p className="text-xs text-stone-400 mt-4">JPG, PNG, PDF up to 10MB</p>
+      </div>
     </div>
   )
 }
 
-function F({ label, warn, children }: { label: string; warn?: boolean; children: ReactNode }){
-  const { t } = useI18n()
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm sm:text-base font-semibold text-stone-800">{label}</span>
-      {children}
-      {warn && (
-        <span className="mt-1.5 flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-amber-900 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-          <span>⚠</span>
-          {t('rv.unclear')}
-        </span>
-      )}
-    </label>
-  )
-}
-
-function Side({ x, h }: { x: Receipt; h: string }){
-  const { lang, t } = useI18n()
-  return (
-    <div className={`${card} space-y-2`}>
-      <h3 className="text-lg font-bold text-stone-900 pb-1 border-b border-stone-100">{h}</h3>
-      <img src={x.fileUrl} alt="" className="w-full max-h-48 object-contain rounded-xl border border-stone-200 bg-stone-50" />
-      <p className="text-base"><b>{x.vendor || '—'}</b></p>
-      <p className="text-sm text-stone-600">{x.date ? day(x.date, lang) : '—'}</p>
-      <p className="text-lg font-bold text-emerald-900">{x.total == null ? '—' : money(x.total, lang, x.currency)}</p>
-      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${catColors[x.category] || catColors.other}`}>
-        {t('cat.' + x.category)}
-      </span>
-    </div>
-  )
-}
-
-function Dup({ r, busy, onDiscard, onKeep }: { r: Receipt; busy: boolean; onDiscard: () => void; onKeep: () => void }){
-  const { t } = useI18n()
-  const o = useLoad(() => api.get(r.duplicateOfId!), [r.duplicateOfId])
-  return (
-    <section className="space-y-4">
-      <div className="rounded-2xl border border-rose-300 bg-rose-50/60 p-4 sm:p-5">
-        <h2 className="text-xl font-bold text-rose-950 flex items-center gap-2">
-          <span>⚠</span> {t('dp.title')}
-        </h2>
-        <p className="text-stone-700 text-sm sm:text-base mt-1">{t('dp.help')}</p>
-      </div>
-      <State {...o}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Side x={r} h={t('dp.new')} />
-          {o.d && <Side x={o.d} h={t('dp.old')} />}
-        </div>
-      </State>
-      <div className="flex flex-col gap-3 sm:flex-row pt-2">
-        <button className={`${ghost} border-rose-300 text-rose-900 hover:bg-rose-50`} disabled={busy} onClick={onDiscard}>
-          {t('dp.discard')}
-        </button>
-        <button className={primary} disabled={busy} onClick={onKeep}>
-          {t('dp.keep')}
-        </button>
-      </div>
-    </section>
-  )
-}
-
-function ReceiptPage({ id }: { id: string }){
-  const { t } = useI18n()
-  const q = useLoad(() => api.get(id), [id])
-  const [f, setF] = useState<Receipt | null>(null)
-  const [note, setNote] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState(false), [gone, setGone] = useState(false)
-
-  useEffect(() => { if (q.d) setF(q.d) }, [q.d])
-  const set = (p: Partial<Receipt>) => setF(x => x && { ...x, ...p })
-
-  const act = async (fn: () => Promise<Receipt | void>, ok: string) => {
-    if (busy) return
-    setBusy(true); setErr(false); setNote('')
-    try {
-      const r = await fn()
-      if (r) setF(r)
-      setNote(t(ok))
-    } catch {
-      setErr(true)
-    }
-    setBusy(false)
-  }
-
-  const ro = f?.status === 'confirmed'
-
-  return (
-    <State {...q}>
-      {gone ? (
-        <div className={`${card} text-center py-12 max-w-md mx-auto space-y-4`}>
-          <CheckCircleIcon className="w-12 h-12 text-emerald-700 mx-auto" />
-          <p className="text-xl font-bold text-stone-900">{t('rv.gone')}</p>
-          <a className={primary} href="#/">{t('rv.goHome')}</a>
-        </div>
-      ) : f && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <a href="#/" className="inline-flex items-center gap-1.5 text-stone-600 hover:text-emerald-800 font-semibold text-sm">
-              <span aria-hidden>←</span> {t('common.back')}
-            </a>
-            <Badge s={f.status} />
-          </div>
-
-          <h1 className={h1}>{ro ? t('rv.titleDone') : t('rv.title')}</h1>
-
-          {f.status === 'duplicate' ? (
-            <Dup
-              r={f}
-              busy={busy}
-              onDiscard={() => act(async () => { await api.discard(id); setGone(true) }, 'rv.gone')}
-              onKeep={() => act(() => api.keepSeparate(id), 'dp.kept')}
-            />
-          ) : (
-            <>
-              {!ro && (
-                <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-4 text-amber-950 flex items-start gap-3">
-                  <span className="text-xl">⚠</span>
-                  <p className="text-sm sm:text-base font-medium">{t('rv.warn')}</p>
-                </div>
-              )}
-
-              <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-                {/* Original receipt viewer */}
-                <details open className={`${card} p-5 space-y-3`}>
-                  <summary className="cursor-pointer text-lg font-bold text-stone-900 select-none">
-                    {t('rv.original')}
-                  </summary>
-                  {f.fileName.toLowerCase().endsWith('.pdf') ? null : (
-                    <img src={f.fileUrl} alt={t('rv.original')} className="w-full max-h-[460px] object-contain rounded-xl border border-stone-200 bg-stone-50 my-2" />
-                  )}
-                  <a href={f.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-800 hover:underline">
-                    <span>{t('rv.open')}</span> ↗
-                  </a>
-                </details>
-
-                {/* Edit Form */}
-                <fieldset disabled={ro || busy} className={`${card} space-y-4`}>
-                  <F label={t('rv.vendor')} warn={!ro && (f.flags.includes('vendor') || !f.vendor)}>
-                    <input className={field} value={f.vendor} onChange={e => set({ vendor: e.target.value })} />
-                  </F>
-
-                  <F label={t('rv.date')} warn={!ro && (f.flags.includes('date') || !f.date)}>
-                    <input type="date" className={field} value={f.date} onChange={e => set({ date: e.target.value })} />
-                  </F>
-
-                  <F label={t('rv.currency')}>
-                    <select className={field} value={f.currency} onChange={e => set({ currency: e.target.value })}>
-                      {['INR', 'USD', 'EUR'].map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </F>
-
-                  <div>
-                    <p className="mb-2 text-sm sm:text-base font-semibold text-stone-800">{t('rv.items')}</p>
-                    <div className="space-y-2.5">
-                      {f.items.map((it, i) => (
-                        <div key={i} className="flex gap-2">
-                          <input
-                            aria-label={t('rv.item')}
-                            placeholder={t('rv.item')}
-                            className={field}
-                            value={it.name}
-                            onChange={e => set({ items: f.items.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })}
-                          />
-                          <input
-                            aria-label={t('rv.amount')}
-                            placeholder={t('rv.amount')}
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            className={`${field} max-w-[130px]`}
-                            value={it.amount}
-                            onChange={e => set({ items: f.items.map((x, j) => j === i ? { ...x, amount: Number(e.target.value) } : x) })}
-                          />
-                          {!ro && (
-                            <button
-                              type="button"
-                              aria-label={t('rv.removeItem')}
-                              className={`${ghost} px-3 text-stone-500 hover:text-rose-700`}
-                              onClick={() => set({ items: f.items.filter((_, j) => j !== i) })}
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      {!ro && (
-                        <button
-                          type="button"
-                          className={`${ghost} w-full text-sm font-semibold`}
-                          onClick={() => set({ items: [...f.items, { name: '', amount: 0 }] })}
-                        >
-                          {t('rv.addItem')}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <F label={t('rv.total')} warn={!ro && (f.flags.includes('total') || f.total == null)}>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      className={field}
-                      value={f.total ?? ''}
-                      onChange={e => set({ total: e.target.value === '' ? null : Number(e.target.value) })}
-                    />
-                  </F>
-
-                  <F label={t('rv.category')}>
-                    <select className={field} value={f.category} onChange={e => set({ category: e.target.value })}>
-                      {CATEGORIES.map(c => <option key={c} value={c}>{t('cat.' + c)}</option>)}
-                    </select>
-                  </F>
-                </fieldset>
-              </div>
-
-              {/* Status and Action Buttons */}
-              <div role="status" aria-live="polite">
-                {busy && <p className="text-base text-stone-600 animate-pulse">{t('rv.saving')}</p>}
-                {note && <p className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 font-semibold">✓ {note}</p>}
-                {err && <p role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900 font-semibold">⚠ {t('common.error')}</p>}
-              </div>
-
-              {ro ? (
-                <div className="pt-2">
-                  <a href="#/ledger" className={primary}>
-                    <ArrowRightIcon className="w-5 h-5" />
-                    <span>{t('rv.goLedger')}</span>
-                  </a>
-                </div>
-              ) : (
-                <div className="space-y-3 pt-2">
-                  <p className="text-sm sm:text-base text-stone-600">{t('rv.confirmHelp')}</p>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button className={ghost} disabled={busy} onClick={() => act(() => api.save(f), 'rv.saved')}>
-                      {t('rv.save')}
-                    </button>
-                    <button
-                      className={prominentBtn}
-                      disabled={busy}
-                      onClick={() => act(async () => { await api.save(f); return api.confirm(id) }, 'rv.confirmed')}
-                    >
-                      <CheckCircleIcon className="w-5 h-5" />
-                      <span>{t('rv.confirm')}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </State>
-  )
-}
-
-function Ledger({ query }: { query: string }){
+function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
   const { t, lang } = useI18n()
   const p = new URLSearchParams(query)
   const blank: Filters = { q: '', from: '', to: '', category: '', vendor: '' }
   const [fl, setFl] = useState<Filters>({ ...blank, category: p.get('category') || '', vendor: p.get('vendor') || '' })
   const [ex, setEx] = useState<'idle' | 'busy' | 'ok' | 'err'>('idle')
 
-  const vendors = useLoad(() => api.summary(), [])
-  const r = useLoad(() => api.list({ ...fl, status: 'confirmed' }), [JSON.stringify(fl)])
+  const vendors = useLoad(() => api.summary(), [refreshKey])
+  const r = useLoad(() => api.list({ ...fl, status: 'confirmed' }), [JSON.stringify(fl), refreshKey])
 
   const up = (k: keyof Filters, v: string) => setFl(x => ({ ...x, [k]: v }))
   const doExport = async () => {
@@ -856,12 +1213,13 @@ function Ledger({ query }: { query: string }){
       {/* Filter controls */}
       <div className={`${card} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
         <div className="sm:col-span-2 lg:col-span-1">
-          <F label={t('lg.search')}>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.search')}</span>
             <div className="relative">
               <input
                 type="search"
                 className={`${field} pl-10`}
-                placeholder="Search..."
+                placeholder="Search vendor or items..."
                 value={fl.q}
                 onChange={e => up('q', e.target.value)}
               />
@@ -869,30 +1227,42 @@ function Ledger({ query }: { query: string }){
                 <SearchIcon className="w-5 h-5" />
               </span>
             </div>
-          </F>
+          </label>
         </div>
 
-        <F label={t('lg.category')}>
-          <select className={field} value={fl.category} onChange={e => up('category', e.target.value)}>
-            <option value="">{t('cat.all')}</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{t('cat.' + c)}</option>)}
-          </select>
-        </F>
+        <div>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.category')}</span>
+            <select className={field} value={fl.category} onChange={e => up('category', e.target.value)}>
+              <option value="">{t('cat.all')}</option>
+              {CATEGORIES.map(c => <option key={c} value={c}>{t('cat.' + c)}</option>)}
+            </select>
+          </label>
+        </div>
 
-        <F label={t('lg.vendor')}>
-          <select className={field} value={fl.vendor} onChange={e => up('vendor', e.target.value)}>
-            <option value="">{t('lg.allVendors')}</option>
-            {vlist.map(v => <option key={v}>{v}</option>)}
-          </select>
-        </F>
+        <div>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.vendor')}</span>
+            <select className={field} value={fl.vendor} onChange={e => up('vendor', e.target.value)}>
+              <option value="">{t('lg.allVendors')}</option>
+              {vlist.map(v => <option key={v}>{v}</option>)}
+            </select>
+          </label>
+        </div>
 
-        <F label={t('lg.from')}>
-          <input type="date" className={field} value={fl.from} onChange={e => up('from', e.target.value)} />
-        </F>
+        <div>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.from')}</span>
+            <input type="date" className={field} value={fl.from} onChange={e => up('from', e.target.value)} />
+          </label>
+        </div>
 
-        <F label={t('lg.to')}>
-          <input type="date" className={field} value={fl.to} onChange={e => up('to', e.target.value)} />
-        </F>
+        <div>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.to')}</span>
+            <input type="date" className={field} value={fl.to} onChange={e => up('to', e.target.value)} />
+          </label>
+        </div>
 
         <div className="flex items-end">
           <button className={`${ghost} w-full`} onClick={() => setFl(blank)}>
@@ -903,14 +1273,14 @@ function Ledger({ query }: { query: string }){
 
       {/* Filtered Receipts List */}
       <State {...r}>
-        <RList rs={r.d ?? []} />
+        <RList rs={r.d ?? []} onSelect={onSelectReceipt} />
       </State>
       <span className="sr-only">{lang}</span>
     </div>
   )
 }
 
-function Ask(){
+function Ask({ onSelectReceipt }: { onSelectReceipt: (r: Receipt) => void }){
   const { t, lang } = useI18n()
   const [q, setQ] = useState(''), [a, setA] = useState<Answer | null>(null), [l, setL] = useState(false), [e, setE] = useState(false)
 
@@ -992,7 +1362,7 @@ function Ask(){
             {a.supported && a.receipts.length > 0 && (
               <div className="space-y-3">
                 <h2 className="text-lg font-bold text-stone-900">{t('qa.sources')}</h2>
-                <RList rs={a.receipts} />
+                <RList rs={a.receipts} onSelect={onSelectReceipt} />
               </div>
             )}
           </div>
@@ -1008,6 +1378,49 @@ export default function App(){
   const [path, query = ''] = h.split('?')
   const rm = path.match(/^\/receipt\/(.+)$/)
 
+  // Modal & Notification State
+  const [activeModal, setActiveModal] = useState<{ id?: string; file?: File } | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Direct route detection for #/receipt/:id
+  useEffect(() => {
+    if (rm && rm[1]) {
+      setActiveModal({ id: rm[1] })
+    }
+  }, [rm?.[1]])
+
+  // Hidden file input for header/dashboard action triggers
+  const hiddenFileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFilePicked = (f?: File) => {
+    if (!f) return
+    if (!OK.includes(f.type)) {
+      alert(t('up.badType'))
+      return
+    }
+    setActiveModal({ file: f })
+  }
+
+  // Handle successful confirmation
+  const handleModalSuccess = (confirmedReceipt: Receipt) => {
+    setActiveModal(null)
+    setRefreshKey(prev => prev + 1)
+    setToastMessage(`${t('rv.successToast')} (${confirmedReceipt.vendor || 'Receipt'})`)
+    setTimeout(() => setToastMessage(null), 5000)
+    // If on receipt page hash, return to home
+    if (location.hash.startsWith('#/receipt/')) {
+      location.hash = '#/'
+    }
+  }
+
+  const handleModalClose = () => {
+    setActiveModal(null)
+    if (location.hash.startsWith('#/receipt/')) {
+      location.hash = '#/'
+    }
+  }
+
   const nav = [
     { p: '/', k: 'nav.home', icon: StoreIcon },
     { p: '/upload', k: 'nav.upload', icon: PlusIcon },
@@ -1017,6 +1430,47 @@ export default function App(){
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-[#1C1917]">
+      {/* Hidden file input for quick "+ Add Receipt" triggers */}
+      <input
+        ref={hiddenFileInputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+        className="sr-only"
+        onChange={e => {
+          handleFilePicked(e.target.files?.[0])
+          e.target.value = ''
+        }}
+      />
+
+      {/* Success Notification Banner / Toast */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-60 max-w-md animate-in slide-in-from-top duration-200">
+          <div className="bg-emerald-800 text-white px-5 py-3.5 rounded-2xl shadow-xl flex items-center justify-between gap-3 border border-emerald-700">
+            <div className="flex items-center gap-2.5">
+              <CheckCircleIcon className="w-5 h-5 text-emerald-300 shrink-0" />
+              <p className="text-sm font-semibold">{toastMessage}</p>
+            </div>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="text-emerald-200 hover:text-white p-1"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Review Receipt Modal Popup */}
+      {activeModal && (
+        <ReviewReceiptModal
+          receiptId={activeModal.id}
+          file={activeModal.file}
+          onClose={handleModalClose}
+          onSuccess={handleModalSuccess}
+        />
+      )}
+
       {/* Top Header */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-2xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:py-4">
@@ -1034,15 +1488,26 @@ export default function App(){
             </div>
           </a>
 
-          {/* Language Switcher Button */}
-          <button
-            className="min-h-[42px] px-3.5 sm:px-4 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
-            aria-label={t('lang.label')}
-            onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
-          >
-            <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
-            <span>{t('lang.other')}</span>
-          </button>
+          {/* Header Action + Language Switcher */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => hiddenFileInputRef.current?.click()}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer"
+            >
+              <PlusIcon className="w-4 h-4" />
+              <span>{t('home.add')}</span>
+            </button>
+
+            <button
+              className="min-h-[42px] px-3.5 sm:px-4 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
+              aria-label={t('lang.label')}
+              onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
+            >
+              <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
+              <span>{t('lang.other')}</span>
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tabs */}
@@ -1073,16 +1538,23 @@ export default function App(){
 
       {/* Main Content View */}
       <main className="mx-auto max-w-5xl w-full px-4 py-6 sm:py-8 flex-1">
-        {rm ? (
-          <ReceiptPage key={rm[1]} id={rm[1]} />
-        ) : path === '/upload' ? (
-          <Upload />
+        {path === '/upload' ? (
+          <Upload onFileSelect={f => setActiveModal({ file: f })} />
         ) : path === '/ledger' ? (
-          <Ledger key={h} query={query} />
+          <Ledger
+            key={h}
+            query={query}
+            onSelectReceipt={r => setActiveModal({ id: r.id })}
+            refreshKey={refreshKey}
+          />
         ) : path === '/ask' ? (
-          <Ask />
+          <Ask onSelectReceipt={r => setActiveModal({ id: r.id })} />
         ) : (
-          <Home />
+          <Home
+            onAddReceipt={() => hiddenFileInputRef.current?.click()}
+            onSelectReceipt={r => setActiveModal({ id: r.id })}
+            refreshKey={refreshKey}
+          />
         )}
       </main>
 

@@ -114,3 +114,34 @@ from backend.app.routers.dashboard import router as dashboard_router
 app.include_router(receipts_router)
 app.include_router(dashboard_router)
 
+
+from fastapi.responses import Response
+
+@app.get("/api/export/csv")
+async def export_expenses_csv():
+    """Export confirmed receipts to CSV format."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT vendor, receipt_date, category, currency, total_paise
+            FROM receipts
+            WHERE status = 'confirmed'
+            ORDER BY receipt_date DESC, created_at DESC;
+            """
+        ).fetchall()
+        lines = ["Vendor,Date,Category,Currency,Total"]
+        for r in rows:
+            v = (r["vendor"] or "").replace('"', '""')
+            d = r["receipt_date"] or ""
+            cat = r["category"] or ""
+            cur = r["currency"] or "INR"
+            tot = f"{r['total_paise'] / 100.0:.2f}" if r["total_paise"] is not None else "0.00"
+            lines.append(f'"{v}",{d},{cat},{cur},{tot}')
+        csv_content = "\n".join(lines)
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=shopledger-expenses.csv"},
+        )
+
+

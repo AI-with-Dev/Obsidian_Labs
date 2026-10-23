@@ -349,3 +349,174 @@ def list_receipts(
 
         return results
 
+
+from backend.app.models import ReceiptUpdatePayload
+
+
+def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
+    """Save user-edited receipt fields and line items to database before confirmation."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, vendor, receipt_date, flags_json FROM receipts WHERE id = ?;",
+            (receipt_id,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Receipt with ID '{receipt_id}' not found.",
+            )
+
+        current_flags = json.loads(row["flags_json"] or "[]")
+        updated_flags = [f for f in current_flags]
+
+        total_paise = None
+        if payload.total is not None:
+            try:
+                total_paise = int(round(Decimal(str(payload.total)) * 100))
+                if "total" in updated_flags:
+                    updated_flags.remove("total")
+            except Exception:
+                total_paise = None
+
+        if payload.vendor and "vendor" in updated_flags:
+            updated_flags.remove("vendor")
+        if payload.date and "date" in updated_flags:
+            updated_flags.remove("date")
+
+        conn.execute(
+            """
+            UPDATE receipts
+            SET vendor = COALESCE(?, vendor),
+                receipt_date = COALESCE(?, receipt_date),
+                currency = COALESCE(?, currency),
+                total_paise = COALESCE(?, total_paise),
+                category = COALESCE(?, category),
+                flags_json = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?;
+            """,
+            (
+                payload.vendor,
+                payload.date,
+                payload.currency,
+                total_paise,
+                payload.category,
+                json.dumps(updated_flags),
+                receipt_id,
+            ),
+        )
+
+        if payload.items is not None:
+            conn.execute("DELETE FROM receipt_items WHERE receipt_id = ?;", (receipt_id,))
+            for idx, it in enumerate(payload.items):
+                try:
+                    line_paise = int(round(Decimal(str(it.amount)) * 100))
+                except Exception:
+                    line_paise = 0
+
+                conn.execute(
+                    """
+                    INSERT INTO receipt_items (receipt_id, item_order, description, quantity, line_total_paise)
+                    VALUES (?, ?, ?, 1.0, ?);
+                    """,
+                    (receipt_id, idx, it.name or "Item", line_paise),
+                )
+
+        conn.execute(
+            """
+            INSERT INTO receipt_events (receipt_id, event_type, details_json)
+            VALUES (?, 'EDITED', ?);
+            """,
+            (
+                receipt_id,
+                json.dumps({
+                    "vendor": payload.vendor,
+                    "date": payload.date,
+                    "total": payload.total,
+                    "category": payload.category,
+                    "items_count": len(payload.items or []),
+                }),
+            ),
+        )
+
+    return get_receipt_details(receipt_id)
+
+
+def confirm_receipt(receipt_id: str) -> dict:
+    """Validate and transition receipt to confirmed status in immutable database ledger."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, vendor, receipt_date, total_paise, status FROM receipts WHERE id = ?;",
+            (receipt_id,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Receipt with ID '{receipt_id}' not found.",
+            )
+
+        if row["total_paise"] is None or row["total_paise"] < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot confirm receipt without a valid non-negative total amount.",
+            )
+
+        conn.execute(
+            """
+            UPDATE receipts
+            SET status = 'confirmed',
+                flags_json = '[]',
+                confirmed_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?;
+            """,
+            (receipt_id,),
+        )
+
+        conn.execute(
+            """
+            INSERT INTO receipt_events (receipt_id, event_type, details_json)
+            VALUES (?, 'CONFIRMED', ?);
+            """,
+            (
+                receipt_id,
+                json.dumps({
+                    "vendor": row["vendor"],
+                    "total_paise": row["total_paise"],
+                }),
+            ),
+        )
+
+    return get_receipt_details(receipt_id)
+
+
+def discard_duplicate(receipt_id: str) -> None:
+    """Mark duplicate receipt upload as discarded."""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE receipts SET status = 'discarded_duplicate', updated_at = CURRENT_TIMESTAMP WHERE id = ?;",
+            (receipt_id,),
+        )
+        conn.execute(
+            "INSERT INTO receipt_events (receipt_id, event_type, details_json) VALUES (?, 'DISCARDED_DUPLICATE', NULL);",
+            (receipt_id,),
+        )
+
+
+def keep_separate(receipt_id: str) -> dict:
+    """Reset potential duplicate upload to needs_review as a distinct expense."""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE receipts SET duplicate_of_receipt_id = NULL, status = 'needs_review', updated_at = CURRENT_TIMESTAMP WHERE id = ?;",
+            (receipt_id,),
+        )
+        conn.execute(
+            "INSERT INTO receipt_events (receipt_id, event_type, details_json) VALUES (?, 'KEPT_SEPARATE', NULL);",
+            (receipt_id,),
+        )
+
+    return get_receipt_details(receipt_id)
+
+
