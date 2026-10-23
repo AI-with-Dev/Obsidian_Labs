@@ -975,11 +975,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                   {t('home.spent')}
                 </p>
                 <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5">
-<<<<<<< HEAD
-                  {money(s.totalReceived ?? s.totalSpent ?? 0, lang)}
-=======
-                  {money(s.totalSpent ?? s.totalReceived ?? 0, lang,currency)}
->>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
+                  {money(s.totalSpent ?? s.totalReceived ?? 0, lang, currency)}
                 </p>
               </div>
               <div className="relative z-10 pt-4 mt-2 border-t border-emerald-800/50 flex items-center justify-between text-xs text-emerald-200/80">
@@ -1097,11 +1093,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                   amount: x.amount,
                   href: `#/ledger?category=${x.category}`
                 }))}
-<<<<<<< HEAD
-                total={s.totalReceived ?? s.totalSpent ?? 0}
-=======
                 total={s.totalSpent ?? s.totalReceived ?? 0}
->>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
               />
             </section>
             <section>
@@ -1548,13 +1540,8 @@ export default function App(){
             </div>
             <button
               onClick={() => setToastMessage(null)}
-<<<<<<< HEAD
               className="text-emerald-200 hover:text-white p-1 cursor-pointer"
-              aria-label="Dismiss"
-=======
-              className="text-emerald-200 hover:text-white p-1"
               aria-label={t('common.dismiss')}
->>>>>>> origin/main
             >
               ✕
             </button>
@@ -1590,60 +1577,6 @@ export default function App(){
             </div>
           </a>
 
-<<<<<<< HEAD
-          {/* Header Dropdown Toggle Trigger Button */}
-          <button
-            type="button"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-expanded={menuOpen}
-            aria-label={t('nav.label')}
-            className="flex items-center gap-2 px-3 py-2 rounded-xs border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 font-semibold text-sm shadow-2xs cursor-pointer transition-colors"
-          >
-            {menuOpen ? (
-              <XIcon className="w-5 h-5 text-stone-700" />
-            ) : (
-              <MenuIcon className="w-5 h-5 text-stone-700" />
-            )}
-            <ChevronDownIcon className={`w-4 h-4 text-stone-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-
-        {/* Dropdown Navigation & Quick Actions Menu */}
-        {menuOpen && (
-          <div className="border-t border-stone-200 bg-white shadow-md animate-in slide-in-from-top-1 duration-150">
-            <div className="mx-auto max-w-5xl px-4 py-3 space-y-3">
-              <nav aria-label={t('nav.label')} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {nav.map(item => {
-                  const active = path === item.p
-                  const Icon = item.icon
-                  return (
-                    <a
-                      key={item.p}
-                      href={'#' + item.p}
-                      aria-current={active ? 'page' : undefined}
-                      onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-2.5 py-2.5 px-3 rounded-xs text-sm font-semibold transition-all ${
-                        active
-                          ? 'bg-emerald-50 text-emerald-900 border border-emerald-300'
-                          : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
-                      <span className="truncate">{t(item.k)}</span>
-                    </a>
-                  )
-                })}
-              </nav>
-
-              <div className="pt-2 border-t border-stone-200/80 flex flex-wrap items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    hiddenFileInputRef.current?.click()
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xs bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer"
-=======
           {/* Header Action + Language Switcher */}
           <div className="flex items-center gap-2 sm:gap-3">
             <button
@@ -1682,27 +1615,14 @@ export default function App(){
                       ? 'bg-white text-emerald-900 shadow-xs border border-stone-200/80'
                       : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
                   }`}
->>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
                 >
-                  <PlusIcon className="w-4 h-4" />
-                  <span>{t('home.add')}</span>
-                </button>
-
-                <button
-                  className="min-h-[38px] px-3.5 rounded-xs border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
-                  aria-label={t('lang.label')}
-                  onClick={() => {
-                    setLang(lang === 'en' ? 'hi' : 'en')
-                    setMenuOpen(false)
-                  }}
-                >
-                  <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
-                  <span>{t('lang.other')}</span>
-                </button>
-              </div>
-            </div>
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
+                  <span className="truncate">{t(item.k)}</span>
+                </a>
+              )
+            })}
           </div>
-        )}
+        </nav>
       </header>
 
       {/* Main Content View */}
