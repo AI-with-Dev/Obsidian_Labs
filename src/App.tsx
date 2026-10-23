@@ -1206,7 +1206,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
         </div>
         <button className={primary} disabled={ex === 'busy'} onClick={doExport}>
           <DownloadIcon className="w-5 h-5" />
-          <span>{t('lg.exportPdf')}</span>
+          <span>{ex === 'busy' ? t('lg.exporting') : t('lg.exportPdf')}</span>
         </button>
       </div>
 
