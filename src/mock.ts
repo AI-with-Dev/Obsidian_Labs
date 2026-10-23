@@ -109,6 +109,7 @@ export const m={
   summary:():Summary=>({
     totalReceived:sum(confIncome()),
     totalSpent:sum(confExpense()),
+    totalBalance:sum(confIncome())-sum(confExpense()),
     confirmedCount:conf().length,
     reviewCount:db.length-conf().length,
     topVendors:group(r=>r.vendor).slice(0,4).map(g=>({vendor:g.key,amount:g.amount})),

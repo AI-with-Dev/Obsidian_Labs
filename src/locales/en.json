@@ -79,7 +79,7 @@
   "cat.all": "All types",
   "home.title": "Your shop at a glance",
   "home.greeting": "Welcome back! Here is your shop summary",
-  "home.spent": "Total spent (confirmed receipts only)",
+  "home.balance": "Total balance (confirmed receipts only)",
   "home.count": "Confirmed receipts",
   "home.review": "Waiting for your check",
   "home.waiting": "Receipts waiting for you",

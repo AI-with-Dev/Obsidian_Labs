@@ -26,6 +26,7 @@ def test_empty_dashboard():
     assert res_summary.status_code == 200
     summary = res_summary.json()["data"]
     assert summary["totalSpent"] == 0.0
+    assert summary["totalBalance"] == 0.0
     assert summary["confirmedCount"] == 0
     assert summary["reviewCount"] == 0
     assert summary["topVendors"] == []
@@ -107,7 +108,7 @@ def test_dashboard_aggregations_and_precision():
 
 
 def test_dashboard_separates_received_income_from_spending():
-    """Owner-firm receipts contribute to received totals, not expenses."""
+    """Dashboard balance is confirmed income minus confirmed expenses."""
     income_id = client.post(
         "/api/receipts/upload",
         files={"file": ("sale.png", io.BytesIO(b"income receipt"), "image/png")},
@@ -128,7 +129,23 @@ def test_dashboard_separates_received_income_from_spending():
             (income_id,),
         )
 
+    expense_id = client.post(
+        "/api/receipts/upload",
+        files={"file": ("purchase.png", io.BytesIO(b"expense receipt"), "image/png")},
+    ).json()["data"]["id"]
+    client.patch(
+        f"/api/receipts/{expense_id}",
+        json={
+            "vendor": "Paper Supplier",
+            "date": "2026-10-21",
+            "total": 300.0,
+            "category": "inventory",
+        },
+    )
+    client.post(f"/api/receipts/{expense_id}/confirm")
+
     summary = client.get("/api/dashboard/summary").json()["data"]
-    assert summary["totalSpent"] == 0.0
+    assert summary["totalSpent"] == 300.0
     assert summary["totalReceived"] == 750.0
-    assert summary["confirmedCount"] == 1
+    assert summary["totalBalance"] == 450.0
+    assert summary["confirmedCount"] == 2

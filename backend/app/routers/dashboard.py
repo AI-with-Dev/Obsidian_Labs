@@ -64,12 +64,16 @@ async def get_dashboard_summary():
 
         total_spent = (spent_row["total_paise"] or 0) / 100.0
         total_received = (received_row["total_paise"] or 0) / 100.0
+        total_balance = (
+            (received_row["total_paise"] or 0) - (spent_row["total_paise"] or 0)
+        ) / 100.0
         confirmed_count = confirmed_row["confirmed_count"] or 0
         review_count = review_row["review_count"] or 0
 
         return ApiResponse.ok({
             "totalSpent": total_spent,
             "totalReceived": total_received,
+            "totalBalance": total_balance,
             "confirmedCount": confirmed_count,
             "reviewCount": review_count,
             "topVendors": top_vendors,

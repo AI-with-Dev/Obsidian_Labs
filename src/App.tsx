@@ -1000,17 +1000,14 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                   </span>
                 </div>
                 <p className="text-emerald-200/90 text-sm font-medium">
-                  {t('home.spent')}
+                  {t('home.balance')}
                 </p>
                 <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5">
-                  {money(s.totalSpent ?? s.totalReceived ?? 0, lang, currency)}
+                  {money(s.totalBalance ?? ((s.totalReceived ?? 0) - s.totalSpent), lang, currency)}
                 </p>
               </div>
-              <div className="relative z-10 pt-4 mt-2 border-t border-emerald-800/50 flex items-center justify-between text-xs text-emerald-200/80">
+              <div className="relative z-10 pt-4 mt-2 border-t border-emerald-800/50 flex items-center text-xs text-emerald-200/80">
                 <span>{s.confirmedCount} {t('home.count').toLowerCase()}</span>
-                <a href="#/ledger" className="underline hover:text-white transition-colors">
-                  {t('home.allConfirmed')} →
-                </a>
               </div>
             </div>
 
