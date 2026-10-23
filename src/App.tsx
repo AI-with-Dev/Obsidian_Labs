@@ -1573,52 +1573,78 @@ export default function App(){
             </div>
           </a>
 
-          {/* Header Action + Language Switcher */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => hiddenFileInputRef.current?.click()}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer"
-            >
-              <PlusIcon className="w-4 h-4" />
-              <span>{t('home.add')}</span>
-            </button>
-
-            <button
-              className="min-h-[42px] px-3.5 sm:px-4 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
-              aria-label={t('lang.label')}
-              onClick={() => void changeLanguage()}
-            >
-              <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
-              <span>{t('lang.other')}</span>
-            </button>
-          </div>
+          {/* Header Dropdown Toggle Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-expanded={menuOpen}
+            aria-label={t('nav.label')}
+            className="flex items-center gap-2 px-3 py-2 rounded-xs border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 font-semibold text-sm shadow-2xs cursor-pointer transition-colors"
+          >
+            {menuOpen ? (
+              <XIcon className="w-5 h-5 text-stone-700" />
+            ) : (
+              <MenuIcon className="w-5 h-5 text-stone-700" />
+            )}
+            <ChevronDownIcon className={`w-4 h-4 text-stone-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
+          </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav aria-label={t('nav.label')} className="mx-auto max-w-5xl px-4 pb-2.5">
-          <div className="grid grid-cols-5 gap-1 sm:gap-2 bg-stone-100/80 p-1 rounded-2xl border border-stone-200/70">
-            {nav.map(item => {
-              const active = path === item.p
-              const Icon = item.icon
-              return (
-                <a
-                  key={item.p}
-                  href={'#' + item.p}
-                  aria-current={active ? 'page' : undefined}
-                  className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 px-2 rounded-xl text-xs sm:text-base font-semibold transition-all ${
-                    active
-                      ? 'bg-white text-emerald-900 shadow-xs border border-stone-200/80'
-                      : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
-                  }`}
+        {/* Dropdown Navigation & Quick Actions Menu */}
+        {menuOpen && (
+          <div className="border-t border-stone-200 bg-white shadow-md animate-in slide-in-from-top-1 duration-150">
+            <div className="mx-auto max-w-5xl px-4 py-3 space-y-3">
+              <nav aria-label={t('nav.label')} className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {nav.map(item => {
+                  const active = path === item.p
+                  const Icon = item.icon
+                  return (
+                    <a
+                      key={item.p}
+                      href={'#' + item.p}
+                      aria-current={active ? 'page' : undefined}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-2.5 py-2.5 px-3 rounded-xs text-sm font-semibold transition-all ${
+                        active
+                          ? 'bg-emerald-50 text-emerald-900 border border-emerald-300'
+                          : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
+                      <span className="truncate">{t(item.k)}</span>
+                    </a>
+                  )
+                })}
+              </nav>
+
+              <div className="pt-2 border-t border-stone-200/80 flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    hiddenFileInputRef.current?.click()
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xs bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer"
                 >
-                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
-                  <span className="truncate">{t(item.k)}</span>
-                </a>
-              )
-            })}
+                  <PlusIcon className="w-4 h-4" />
+                  <span>{t('home.add')}</span>
+                </button>
+
+                <button
+                  className="min-h-[38px] px-3.5 rounded-xs border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
+                  aria-label={t('lang.label')}
+                  onClick={() => {
+                    void changeLanguage()
+                    setMenuOpen(false)
+                  }}
+                >
+                  <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
+                  <span>{t('lang.other')}</span>
+                </button>
+              </div>
+            </div>
           </div>
-        </nav>
+        )}
       </header>
 
       {/* Main Content View */}
