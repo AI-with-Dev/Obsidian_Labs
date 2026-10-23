@@ -115,6 +115,21 @@ async def health_check():
     })
 
 
+@app.get("/healthz")
+async def streamlit_health_check():
+    """Provide the plain HTTP health endpoint expected by Streamlit hosting."""
+    try:
+        with get_db() as conn:
+            conn.execute("SELECT 1;").fetchone()
+    except Exception as exc:
+        logger.error("Streamlit health check database failure: %s", exc)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "unhealthy"},
+        )
+    return {"status": "ok"}
+
+
 # Routers
 from backend.app.routers.receipts import router as receipts_router
 from backend.app.routers.dashboard import router as dashboard_router
