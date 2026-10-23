@@ -1,6 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, status
+import csv
+import io
+
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -8,6 +11,7 @@ from fastapi.responses import JSONResponse
 from backend.app.config import settings
 from backend.app.database import get_db, init_db
 from backend.app.models import ApiResponse
+from backend.app.routers.auth import require_authenticated_owner, router as auth_router
 
 # Configure server-side logging
 logging.basicConfig(
@@ -111,13 +115,14 @@ async def health_check():
 from backend.app.routers.receipts import router as receipts_router
 from backend.app.routers.dashboard import router as dashboard_router
 
+app.include_router(auth_router)
 app.include_router(receipts_router)
 app.include_router(dashboard_router)
 
 
 from fastapi.responses import Response
 
-@app.get("/api/export/pdf")
+@app.get("/api/export/pdf", dependencies=[Depends(require_authenticated_owner)])
 async def export_payments_pdf():
     """Export confirmed customer receipts/payments to official PDF format."""
     with get_db() as conn:
@@ -178,4 +183,37 @@ async def export_payments_pdf():
         )
 
 
+@app.get("/api/export/csv", dependencies=[Depends(require_authenticated_owner)])
+async def export_payments_csv():
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT vendor, receipt_date, category, currency, total_paise, status
+            FROM receipts
+            WHERE status = 'confirmed'
+            ORDER BY receipt_date DESC, created_at DESC;
+            """
+        ).fetchall()
 
+    stream = io.StringIO(newline="")
+    writer = csv.writer(stream)
+    writer.writerow(["Customer / payer", "Date", "Category", "Currency", "Amount", "Status"])
+    for row in rows:
+        values = [
+            row["vendor"] or "",
+            row["receipt_date"] or "",
+            row["category"] or "",
+            row["currency"] or "INR",
+            f"{(row['total_paise'] or 0) / 100:.2f}",
+            row["status"],
+        ]
+        writer.writerow([
+            f"'{value}" if isinstance(value, str) and value.startswith(("=", "+", "-", "@")) else value
+            for value in values
+        ])
+
+    return Response(
+        content=stream.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=shopledger-ledger.csv"},
+    )

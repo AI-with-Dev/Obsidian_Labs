@@ -5,14 +5,17 @@ export type Lang='en'|'hi'
 const dict:Record<Lang,Record<string,string>>={en,hi}
 export const dictFor=(l:Lang)=>dict[l]
 type V=Record<string,string|number>
-interface C{lang:Lang;setLang:(l:Lang)=>void;t:(k:string,v?:V)=>string}
+interface C{lang:Lang;setLang:(l:Lang)=>void;currency:string;setCurrency:(c:string)=>void;t:(k:string,v?:V)=>string}
 const Ctx=createContext<C>(null as unknown as C)
 export function I18n({children}:{children:ReactNode}){
-  const [lang,set]=useState<Lang>(()=>(localStorage.getItem('lang') as Lang)||'en')
+  const storedLang=localStorage.getItem('lang')
+  const [lang,set]=useState<Lang>(storedLang==='hi'?'hi':'en')
+  const [currency,setCurrency]=useState(()=>localStorage.getItem('currency')||'INR')
   const setLang=(l:Lang)=>{localStorage.setItem('lang',l);set(l)}
+  const updateCurrency=(c:string)=>{localStorage.setItem('currency',c);setCurrency(c)}
   document.documentElement.lang=lang
   const t=(k:string,v:V={})=>(dict[lang][k]??k).replace(/\{(\w+)\}/g,(_,x)=>String(v[x]??''))
-  return <Ctx.Provider value={{lang,setLang,t}}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{lang,setLang,currency,setCurrency:updateCurrency,t}}>{children}</Ctx.Provider>
 }
 export const useI18n=()=>useContext(Ctx)
 const loc=(l:Lang)=>l==='hi'?'hi-IN':'en-IN'

@@ -56,6 +56,29 @@ CREATE INDEX IF NOT EXISTS idx_receipts_file_hash ON receipts(file_hash);
 CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(status);
 CREATE INDEX IF NOT EXISTS idx_receipts_vendor_date ON receipts(vendor, receipt_date);
 CREATE INDEX IF NOT EXISTS idx_items_receipt_id ON receipt_items(receipt_id);
+
+-- The application is scoped to one shop owner.
+CREATE TABLE IF NOT EXISTS shop_owner (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    full_name TEXT NOT NULL,
+    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    password_hash TEXT NOT NULL,
+    business_name TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    gstin TEXT NOT NULL DEFAULT '',
+    language TEXT NOT NULL DEFAULT 'en',
+    currency TEXT NOT NULL DEFAULT 'INR',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS login_sessions (
+    token_hash TEXT PRIMARY KEY,
+    owner_id INTEGER NOT NULL REFERENCES shop_owner(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_login_sessions_expiry ON login_sessions(expires_at);
 """
 
 

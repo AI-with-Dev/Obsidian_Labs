@@ -1,6 +1,8 @@
 import {useCallback,useEffect,useState,useRef,ReactNode} from 'react'
 import {useI18n,money,day} from './i18n'
 import * as api from './api'
+import {Account} from './api'
+import {AuthPage,SettingsPage} from './account'
 import {CATEGORIES,Receipt,Item,Filters,Answer} from './types'
 
 // Reusable SVG Icons for clear, simple visual guidance
@@ -33,6 +35,9 @@ function DownloadIcon({className="w-5 h-5"}:{className?:string}){
 }
 function SearchIcon({className="w-5 h-5"}:{className?:string}){
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+}
+function SettingsIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1a2 2 0 0 1-2.8 2.8l-.1-.1a2 2 0 0 0-3.4 1.4v.2a2 2 0 0 1-4 0v-.2A2 2 0 0 0 5.8 18l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a2 2 0 0 0-1.4-3.4h-.2a2 2 0 0 1 0-4h.2A2 2 0 0 0 3 4.2l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a2 2 0 0 0 3.4-1.4v-.2a2 2 0 0 1 4 0V0a2 2 0 0 0 3.4 1.4l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a2 2 0 0 0 1.4 3.4h.2a2 2 0 0 1 0 4h-.2a2 2 0 0 0-1.4 3.4Z" transform="translate(1 2) scale(.92)"/></svg>
 }
 function UploadCloudIcon({className="w-8 h-8"}:{className?:string}){
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
@@ -188,7 +193,7 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
 }
 
 function CategoryBreakdown({ rows, total }: { rows: { label: string; amount: number; href: string }[]; total: number }){
-  const { lang } = useI18n()
+  const { lang,currency } = useI18n()
   if (!rows.length) return null
   return (
     <div className="space-y-2.5">
@@ -202,7 +207,7 @@ function CategoryBreakdown({ rows, total }: { rows: { label: string; amount: num
           >
             <div className="flex justify-between items-center gap-2 mb-2 text-base">
               <span className="font-semibold text-stone-800 group-hover:text-emerald-800 transition-colors">{r.label}</span>
-              <span className="font-bold text-stone-900">{money(r.amount, lang)}</span>
+              <span className="font-bold text-stone-900">{money(r.amount, lang,currency)}</span>
             </div>
             <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
               <div
@@ -219,7 +224,7 @@ function CategoryBreakdown({ rows, total }: { rows: { label: string; amount: num
 }
 
 function TopVendorsList({ rows }: { rows: { label: string; amount: number; href: string }[] }){
-  const { lang } = useI18n()
+  const { lang,currency } = useI18n()
   if (!rows.length) return null
   return (
     <ul className="space-y-2.5">
@@ -235,7 +240,7 @@ function TopVendorsList({ rows }: { rows: { label: string; amount: number; href:
               </span>
               <span className="font-semibold text-stone-800 group-hover:text-emerald-800 transition-colors">{r.label}</span>
             </div>
-            <b className="font-bold text-stone-900">{money(r.amount, lang)}</b>
+            <b className="font-bold text-stone-900">{money(r.amount, lang,currency)}</b>
           </a>
         </li>
       ))}
@@ -902,7 +907,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
 }
 
 function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () => void; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
-  const { t, lang } = useI18n()
+  const { t, lang,currency } = useI18n()
   const q = useLoad(() => Promise.all([
     api.summary(),
     api.categories(),
@@ -964,7 +969,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                   {t('home.spent')}
                 </p>
                 <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5">
-                  {money(s.totalSpent, lang)}
+                  {money(s.totalSpent ?? s.totalReceived ?? 0, lang,currency)}
                 </p>
               </div>
               <div className="relative z-10 pt-4 mt-2 border-t border-emerald-800/50 flex items-center justify-between text-xs text-emerald-200/80">
@@ -1082,7 +1087,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                   amount: x.amount,
                   href: `#/ledger?category=${x.category}`
                 }))}
-                total={s.totalSpent}
+                total={s.totalSpent ?? s.totalReceived ?? 0}
               />
             </section>
             <section>
@@ -1373,7 +1378,38 @@ function Ask({ onSelectReceipt }: { onSelectReceipt: (r: Receipt) => void }){
 }
 
 export default function App(){
-  const { t, lang, setLang } = useI18n()
+  const { t, lang, setLang, setCurrency } = useI18n()
+  const [authLoading,setAuthLoading]=useState(true)
+  const [authConfigured,setAuthConfigured]=useState(false)
+  const [authError,setAuthError]=useState('')
+  const [account,setAccount]=useState<Account|null>(null)
+  const loadAuth=useCallback(async()=>{
+    setAuthLoading(true)
+    setAuthError('')
+    try{
+      const state=await api.authStatus()
+      setAuthConfigured(state.configured)
+      setAccount(state.account)
+      if(state.account){
+        setLang(state.account.language)
+        setCurrency(state.account.currency)
+      }
+    }catch(error){
+      setAuthError(error instanceof Error?error.message:t('auth.error'))
+    }finally{
+      setAuthLoading(false)
+    }
+  },[setLang,setCurrency,t])
+  useEffect(()=>{void loadAuth()},[loadAuth])
+  useEffect(()=>{
+    const expired=()=>{
+      setAccount(null)
+      setAuthConfigured(true)
+      setAuthError('')
+    }
+    window.addEventListener('shopledger:unauthorized',expired)
+    return ()=>window.removeEventListener('shopledger:unauthorized',expired)
+  },[])
   const h = useHash()
   const [path, query = ''] = h.split('?')
   const rm = path.match(/^\/receipt\/(.+)$/)
@@ -1421,12 +1457,53 @@ export default function App(){
     }
   }
 
+  const handleAuthenticated = (nextAccount:Account) => {
+    setAccount(nextAccount)
+    setAuthConfigured(true)
+    setAuthError('')
+    setLang(nextAccount.language)
+    setCurrency(nextAccount.currency)
+  }
+
+  const handleSignOut = async () => {
+    try{
+      await api.signOut()
+      setAccount(null)
+      location.hash='#/'
+    }catch(error){
+      setToastMessage(error instanceof Error?error.message:t('auth.error'))
+      setTimeout(()=>setToastMessage(null),5000)
+    }
+  }
+
+  const changeLanguage = async () => {
+    if(!account)return
+    const language=lang==='en'?'hi':'en'
+    try{
+      const updated=await api.saveProfile({...account,language})
+      setAccount(updated)
+      setLang(updated.language)
+    }catch(error){
+      setToastMessage(error instanceof Error?error.message:t('settings.saveError'))
+      setTimeout(()=>setToastMessage(null),5000)
+    }
+  }
+
   const nav = [
     { p: '/', k: 'nav.home', icon: StoreIcon },
     { p: '/upload', k: 'nav.upload', icon: PlusIcon },
     { p: '/ledger', k: 'nav.ledger', icon: ReceiptIcon },
-    { p: '/ask', k: 'nav.ask', icon: SparklesIcon }
+    { p: '/ask', k: 'nav.ask', icon: SparklesIcon },
+    { p: '/settings', k: 'nav.settings', icon: SettingsIcon }
   ]
+
+  if(authLoading){
+    return <main className="flex min-h-screen items-center justify-center bg-[#FAF7F2] text-lg font-semibold text-stone-600">{t('common.loading')}</main>
+  }
+
+  if(!account){
+    return <AuthPage configured={authConfigured} error={authError} onRetry={()=>void loadAuth()} onAuthenticated={handleAuthenticated}/>
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-[#1C1917]">
@@ -1502,7 +1579,7 @@ export default function App(){
             <button
               className="min-h-[42px] px-3.5 sm:px-4 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
               aria-label={t('lang.label')}
-              onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
+              onClick={() => void changeLanguage()}
             >
               <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
               <span>{t('lang.other')}</span>
@@ -1512,7 +1589,7 @@ export default function App(){
 
         {/* Navigation Tabs */}
         <nav aria-label={t('nav.label')} className="mx-auto max-w-5xl px-4 pb-2.5">
-          <div className="grid grid-cols-4 gap-1 sm:gap-2 bg-stone-100/80 p-1 rounded-2xl border border-stone-200/70">
+          <div className="grid grid-cols-5 gap-1 sm:gap-2 bg-stone-100/80 p-1 rounded-2xl border border-stone-200/70">
             {nav.map(item => {
               const active = path === item.p
               const Icon = item.icon
@@ -1549,6 +1626,8 @@ export default function App(){
           />
         ) : path === '/ask' ? (
           <Ask onSelectReceipt={r => setActiveModal({ id: r.id })} />
+        ) : path === '/settings' ? (
+          <SettingsPage account={account} onAccountUpdated={updated=>{setAccount(updated);setCurrency(updated.currency)}} onSignOut={handleSignOut}/>
         ) : (
           <Home
             onAddReceipt={() => hiddenFileInputRef.current?.click()}
