@@ -1,9 +1,14 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from backend.app.models import ApiResponse
+from backend.app.routers.auth import require_authenticated_owner
 from backend.app.services.question_service import execute_question_answer
 
-router = APIRouter(prefix="/api/questions", tags=["Questions"])
+router = APIRouter(
+    prefix="/api/questions",
+    tags=["Questions"],
+    dependencies=[Depends(require_authenticated_owner)],
+)
 
 
 class AskQuestionPayload(BaseModel):

@@ -36,6 +36,8 @@ def test_database_tables_exist(test_db_setup):
         assert "receipts" in tables
         assert "receipt_items" in tables
         assert "receipt_events" in tables
+        assert "shop_owner" in tables
+        assert "login_sessions" in tables
 
 
 def test_sqlite_pragmas(test_db_setup):

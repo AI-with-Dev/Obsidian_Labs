@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, status
+
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -8,6 +9,7 @@ from fastapi.responses import JSONResponse
 from backend.app.config import settings
 from backend.app.database import get_db, init_db
 from backend.app.models import ApiResponse
+from backend.app.routers.auth import require_authenticated_owner, router as auth_router
 
 # Configure server-side logging
 logging.basicConfig(
@@ -114,6 +116,7 @@ from backend.app.routers.questions import router as questions_router
 
 from backend.app.routers.export import router as export_router
 
+app.include_router(auth_router)
 app.include_router(receipts_router)
 app.include_router(dashboard_router)
 app.include_router(questions_router)
@@ -122,7 +125,7 @@ app.include_router(export_router)
 
 from fastapi.responses import Response
 
-@app.get("/api/export/pdf")
+@app.get("/api/export/pdf", dependencies=[Depends(require_authenticated_owner)])
 async def export_payments_pdf():
     """Export confirmed customer receipts/payments to official PDF format."""
     with get_db() as conn:
@@ -181,6 +184,3 @@ async def export_payments_pdf():
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=shopledger-payment-summary.pdf"},
         )
-
-
-

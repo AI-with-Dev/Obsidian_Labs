@@ -1,8 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from backend.app.database import get_db
 from backend.app.models import ApiResponse
+from backend.app.routers.auth import require_authenticated_owner
 
-router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+router = APIRouter(
+    prefix="/api/dashboard",
+    tags=["Dashboard"],
+    dependencies=[Depends(require_authenticated_owner)],
+)
 
 
 @router.get("/summary", response_model=ApiResponse[dict])

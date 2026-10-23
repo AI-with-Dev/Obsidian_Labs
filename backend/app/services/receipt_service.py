@@ -757,4 +757,3 @@ def keep_separate(receipt_id: str) -> dict:
         )
 
     return get_receipt_details(receipt_id)
-

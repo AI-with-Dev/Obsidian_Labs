@@ -1,13 +1,18 @@
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 
+from backend.app.routers.auth import require_authenticated_owner
 from backend.app.models import ApiResponse
 from backend.app.services.receipt_service import (
     get_receipt_file,
     process_and_save_upload,
 )
 
-router = APIRouter(prefix="/api/receipts", tags=["Receipts"])
+router = APIRouter(
+    prefix="/api/receipts",
+    tags=["Receipts"],
+    dependencies=[Depends(require_authenticated_owner)],
+)
 
 
 @router.post("/upload", response_model=ApiResponse[dict])
@@ -108,4 +113,3 @@ async def keep_separate_endpoint(id: str):
     """Keep receipt as a separate expense."""
     data = keep_separate(id)
     return ApiResponse.ok(data)
-

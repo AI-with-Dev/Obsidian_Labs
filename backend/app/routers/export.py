@@ -2,14 +2,19 @@ import csv
 import io
 import logging
 from typing import Any
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 
 from backend.app.database import get_db
+from backend.app.routers.auth import require_authenticated_owner
 
 logger = logging.getLogger("shopledger.export")
 
-router = APIRouter(prefix="/api/export", tags=["export"])
+router = APIRouter(
+    prefix="/api/export",
+    tags=["export"],
+    dependencies=[Depends(require_authenticated_owner)],
+)
 
 
 def sanitize_csv_cell(value: Any) -> str:

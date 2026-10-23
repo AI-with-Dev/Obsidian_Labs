@@ -1,4 +1,4 @@
-// MOCK BACKEND — delete/ignore once VITE_API_BASE_URL points to the real API.
+// SAMPLE DATA — enable with VITE_API_BASE_URL=mock for receipt-screen previews.
 import {Receipt,Summary,CategoryTotal,Answer,Filters} from './types'
 import {Lang,dictFor} from './i18n'
 

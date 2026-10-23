@@ -2,12 +2,17 @@
   "app.name": "ShopLedger",
   "nav.home": "Home",
 <<<<<<< HEAD
+<<<<<<< HEAD
   "nav.upload": "Add Payment",
   "nav.ledger": "Payment Ledger",
 =======
   "nav.upload": "Add receipt",
   "nav.ledger": "My expenses",
 >>>>>>> origin/main
+=======
+  "nav.upload": "Record payment",
+  "nav.ledger": "Payment ledger",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "nav.ask": "Ask a question",
   "nav.label": "Main menu",
   "lang.label": "Change language",
@@ -18,6 +23,7 @@
   "common.back": "← Back",
   "common.open": "Open",
   "common.none": "Not given",
+<<<<<<< HEAD
 <<<<<<< HEAD
   "status.draft": "Waiting for check",
   "status.confirmed": "Confirmed",
@@ -34,6 +40,9 @@
   "cat.transport": "Transport / freight",
 =======
   "status.draft": "Waiting for your check",
+=======
+  "status.draft": "Pending verification",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "status.confirmed": "Confirmed",
   "status.duplicate": "Possible repeat",
   "cat.inventory": "Stock / goods",
@@ -43,6 +52,7 @@
   "cat.utilities": "Electricity, water, etc.",
   "cat.rent": "Rent",
   "cat.repairs": "Repairs",
+<<<<<<< HEAD
   "cat.other": "Other",
   "cat.all": "All types",
   "home.title": "Your shop at a glance",
@@ -96,16 +106,49 @@
 =======
   "up.reading": "Reading your receipt… this may take a moment.",
 >>>>>>> origin/main
+=======
+  "cat.other": "Other collections",
+  "cat.all": "All categories",
+  "home.title": "Your shop revenue at a glance",
+  "home.greeting": "Welcome back! Here is your collections summary",
+  "home.spent": "Total Money Received (Confirmed)",
+  "home.count": "Confirmed Payments",
+  "home.review": "Pending Verification",
+  "home.waiting": "Payments waiting for your check",
+  "home.none": "All payments verified. Well done!",
+  "home.cats": "Revenue by category",
+  "home.vendors": "Top paying customers & clients",
+  "home.empty": "No customer payments recorded yet. Record your first payment.",
+  "home.add": "Record payment",
+  "home.recent": "Recent Customer Payments",
+  "home.recentHelp": "Latest payments and collections received in your shop",
+  "home.reviewNow": "Verify now",
+  "home.viewAll": "View all",
+  "home.verifiedBadge": "Verified Income Ledger",
+  "home.pendingBadge": "Verification needed",
+  "home.allClear": "All payments verified",
+  "up.title": "Record a payment / receipt",
+  "up.help": "Take a clear photo of the customer bill or payment slip, or choose a file. Accepted: JPG, PNG, or short PDF.",
+  "up.choose": "Choose photo or receipt",
+  "up.selected": "Selected file",
+  "up.send": "Upload and read receipt",
+  "up.sending": "Uploading payment receipt…",
+  "up.reading": "Reading payment receipt… this may take a moment.",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "up.badType": "This file type is not accepted. Please choose a JPG, PNG or PDF file.",
-  "up.fail": "We could not upload this receipt. Check your internet and try again.",
-  "up.done": "Done! Your receipt was read.",
-  "up.next": "Check the details",
+  "up.fail": "We could not upload this payment receipt. Check your internet and try again.",
+  "up.done": "Done! Payment details read.",
+  "up.next": "Verify the details",
   "rv.title": "Review Receipt",
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "rv.titleDone": "Payment details",
   "rv.addReceipt": "Add Payment",
   "rv.addingReceipt": "Adding Payment…",
   "rv.details": "Payment Details",
+<<<<<<< HEAD
   "rv.invoiceNo": "Invoice / Bill No.",
   "rv.itemsSection": "Items sold",
 =======
@@ -116,6 +159,10 @@
   "rv.invoiceNo": "Invoice / Bill No.",
   "rv.itemsSection": "Items",
 >>>>>>> origin/main
+=======
+  "rv.invoiceNo": "Invoice / Bill No.",
+  "rv.itemsSection": "Purchased Items",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "rv.qty": "Qty",
   "rv.price": "Unit Price",
   "rv.summary": "Amount Summary",
@@ -129,17 +176,23 @@
   "rv.credit": "Credit / Udhar",
   "rv.notes": "Notes",
 <<<<<<< HEAD
+<<<<<<< HEAD
   "rv.validationError": "Please enter a valid customer name, date, and total amount.",
   "rv.successToast": "Payment verified and added to your ledger!",
 =======
   "rv.validationError": "Please enter a valid shop name, date, and total amount.",
   "rv.successToast": "Receipt verified and added to your ledger!",
 >>>>>>> origin/main
+=======
+  "rv.validationError": "Please enter a valid customer name, date, and total amount received.",
+  "rv.successToast": "Payment verified and recorded in your revenue ledger!",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "rv.close": "Close",
   "rv.preview": "Receipt image",
   "rv.warn": "The computer read this receipt, but it can make mistakes. Please check every detail below.",
   "rv.original": "Original receipt",
   "rv.open": "Open original file",
+<<<<<<< HEAD
 <<<<<<< HEAD
   "rv.vendor": "Customer / Payer name",
   "rv.date": "Date",
@@ -151,10 +204,17 @@
   "rv.currency": "Currency",
   "rv.items": "Items bought",
 >>>>>>> origin/main
+=======
+  "rv.vendor": "Customer / Payer name",
+  "rv.date": "Payment Date",
+  "rv.currency": "Currency",
+  "rv.items": "Items sold",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "rv.item": "Item name",
   "rv.amount": "Amount",
   "rv.addItem": "+ Add an item",
   "rv.removeItem": "Remove this item",
+<<<<<<< HEAD
 <<<<<<< HEAD
   "rv.total": "Total amount received",
   "rv.category": "Type of payment",
@@ -176,12 +236,24 @@
   "rv.confirmed": "Receipt confirmed. It is now in your expenses.",
   "rv.goLedger": "See my expenses",
 >>>>>>> origin/main
+=======
+  "rv.total": "Total amount received",
+  "rv.category": "Revenue category",
+  "rv.unclear": "Please check this. It looks unclear or missing.",
+  "rv.save": "Save and verify later",
+  "rv.saved": "Saved. You can come back to this payment anytime.",
+  "rv.confirm": "Confirm payment",
+  "rv.confirmHelp": "Confirmed payments are added to your verified revenue ledger. Confirm when everything is correct.",
+  "rv.confirmed": "Payment confirmed. It is now recorded in your revenue ledger.",
+  "rv.goLedger": "See payment ledger",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "rv.saving": "Please wait…",
-  "rv.gone": "This upload was discarded.",
+  "rv.gone": "This payment upload was discarded.",
   "rv.goHome": "Go to home",
-  "dp.title": "This may be a repeat",
+  "dp.title": "This may be a repeat payment",
   "dp.help": "This is only a warning. We may be wrong. You decide what to do.",
   "dp.new": "New upload",
+<<<<<<< HEAD
 <<<<<<< HEAD
   "dp.old": "Earlier payment",
   "dp.discard": "Discard this upload as a duplicate",
@@ -206,19 +278,23 @@
   "qa.title": "Ask about your revenue & payments",
 =======
   "dp.old": "Earlier receipt",
+=======
+  "dp.old": "Earlier payment",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "dp.discard": "Discard this upload as a duplicate",
-  "dp.keep": "Keep as a separate purchase",
-  "dp.kept": "Kept as a separate purchase. Please check its details below.",
-  "lg.title": "My expenses",
-  "lg.help": "This list shows only receipts you have confirmed.",
-  "lg.search": "Search by shop or item",
+  "dp.keep": "Keep as a separate payment",
+  "dp.kept": "Kept as a separate payment. Please check its details below.",
+  "lg.title": "Payment Ledger",
+  "lg.help": "This ledger shows all verified money received from customers.",
+  "lg.search": "Search by customer or item",
   "lg.searchPlaceholder": "Search by shop or item name…",
   "lg.from": "From date",
   "lg.to": "To date",
-  "lg.vendor": "Shop",
-  "lg.allVendors": "All shops",
-  "lg.category": "Type",
+  "lg.vendor": "Customer / Payer",
+  "lg.allVendors": "All customers",
+  "lg.category": "Category",
   "lg.clear": "Clear filters",
+<<<<<<< HEAD
   "lg.empty": "No receipts found.",
   "lg.export": "Download expenses (CSV)",
   "lg.exporting": "Preparing your file…",
@@ -227,10 +303,20 @@
   "qa.title": "Ask about your expenses",
 >>>>>>> origin/main
   "qa.help": "Tap a question, or type your own.",
+=======
+  "lg.empty": "No customer payments found.",
+  "lg.export": "Download Payment Summary (PDF)",
+  "lg.exporting": "Generating official PDF document…",
+  "lg.exportOk": "Your PDF payment summary has been generated and downloaded.",
+  "lg.exportErr": "We could not generate your PDF summary. Please try again.",
+  "qa.title": "Ask about your revenue",
+  "qa.help": "Tap a question, or ask about payments received.",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "qa.placeholder": "Type your question here",
   "qa.send": "Ask",
   "qa.thinking": "Finding the answer…",
   "qa.sources": "Receipts behind this answer",
+<<<<<<< HEAD
 <<<<<<< HEAD
   "qa.ex1": "How much money have I received in total?",
   "qa.ex2": "How much did I receive in each category?",
@@ -255,6 +341,19 @@
   "qa.ans.vendor": "You spent the most at {name}: {amount}.",
   "qa.ans.dates": "Between 1 and 15 October you spent {amount}.",
   "qa.ans.review": "{n} receipts are waiting for your check.",
+=======
+  "qa.ex1": "How much money have I received in total?",
+  "qa.ex2": "How much revenue came from each category?",
+  "qa.ex3": "Which customer paid the most?",
+  "qa.ex4": "What revenue was received between 1 and 15 October?",
+  "qa.ex5": "Which customer payments are waiting for review?",
+  "qa.unsupported": "Sorry, I can only answer questions about your customer payments and revenue. Try one of the examples above.",
+  "qa.ans.total": "You have received {amount} in total from {n} confirmed customer payments.",
+  "qa.ans.category": "You received the most from “{name}”: {amount}.",
+  "qa.ans.vendor": "Top paying customer is {name} with {amount} paid.",
+  "qa.ans.dates": "Between 1 and 15 October you received {amount}.",
+  "qa.ans.review": "{n} customer payments are waiting for your verification.",
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f
   "qa.assistant": "ShopLedger Assistant",
   "rv.showPreview": "Show preview ▼",
   "rv.hidePreview": "Hide preview ▲",
@@ -267,6 +366,61 @@
   "cat.wholesale_collection": "Wholesale collection",
   "cat.advance_payment": "Advance payment",
   "cat.credit_recovery": "Credit / Udhar recovery",
+<<<<<<< HEAD
   "cat.service_fee": "Service fee"
 >>>>>>> origin/main
 }
+=======
+  "cat.service_fee": "Service fee",
+  "nav.settings": "Settings",
+  "auth.setupTitle": "Set up your owner account",
+  "auth.setupHelp": "Create your secure sign-in and add your shop details. This is the only owner account for this shop.",
+  "auth.loginTitle": "Welcome back",
+  "auth.loginHelp": "Sign in to continue to your ShopLedger account.",
+  "auth.fullName": "Your full name",
+  "auth.businessName": "Shop or business name",
+  "auth.email": "Email address",
+  "auth.phone": "Phone number (optional)",
+  "auth.address": "Business address (optional)",
+  "auth.gstin": "GSTIN (optional)",
+  "auth.language": "Preferred language",
+  "auth.english": "English",
+  "auth.hindi": "हिन्दी",
+  "auth.currency": "Display currency",
+  "auth.password": "Password",
+  "auth.confirmPassword": "Confirm password",
+  "auth.passwordHelp": "Use at least 12 characters, including an uppercase and lowercase letter, a number, and a symbol.",
+  "auth.passwordMismatch": "The passwords do not match.",
+  "auth.createAccount": "Create secure account",
+  "auth.signIn": "Sign in",
+  "auth.working": "Please wait…",
+  "auth.privacy": "Your password is stored as a secure hash. Your session cookie is HTTP-only.",
+  "auth.error": "We could not connect to ShopLedger. Check that the local API server is running.",
+  "auth.retry": "Try again",
+  "settings.currencyNote": "Changes display formatting only; it does not convert saved amounts.",
+  "settings.title": "Settings",
+  "settings.help": "Manage your owner account, shop details, and preferences.",
+  "settings.confirmEmailChange": "Confirm your current password to change your sign-in email",
+  "settings.businessTitle": "Owner and business profile",
+  "settings.businessHelp": "These details are kept in your local ShopLedger database.",
+  "settings.securityTitle": "Password and security",
+  "settings.securityHelp": "Changing your password signs out other active sessions.",
+  "settings.currentPassword": "Current password",
+  "settings.newPassword": "New password",
+  "settings.updatePassword": "Update password",
+  "settings.passwordSaved": "Your password was updated successfully.",
+  "settings.dataTitle": "Your shop data",
+  "settings.dataHelp": "Download a copy of your ledger for your records.",
+  "settings.exportCsv": "Download ledger CSV",
+  "settings.exportPdf": "Download summary PDF",
+  "settings.exported": "Your export is ready.",
+  "settings.exportError": "The export could not be created. Please try again.",
+  "settings.dataNote": "Exports include the receipt ledger. Keep downloaded files somewhere private.",
+  "settings.sessionTitle": "Sign out",
+  "settings.sessionHelp": "End this browser session on this device.",
+  "settings.signOut": "Sign out",
+  "settings.save": "Save changes",
+  "settings.saved": "Your settings were saved.",
+  "settings.saveError": "We could not save your settings. Please try again."
+}
+>>>>>>> 24e75192b7955b37dd917e772579d506e851ee6f

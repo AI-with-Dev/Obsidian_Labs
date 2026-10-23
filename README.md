@@ -24,6 +24,7 @@ The app pairs an accessible, Claude-built React + TypeScript frontend (supportin
 - **Safe Expense Q&A**: Answers 5 targeted financial questions with supporting receipt links using fixed safe queries.
 - **Formula-Safe CSV Export**: Generates ledger exports with formula-injection defenses (`=`, `+`, `-`, `@` escaped).
 - **Full Bilingual Support (EN / HI)**: Complete English and natural Devanagari Hindi interface with instant language switching and persistent preferences.
+- **Owner Account & Settings**: One-time owner signup, password login, secure server-side sessions, editable business profile, language/currency preferences, password changes, and ledger exports.
 
 ---
 
@@ -41,15 +42,16 @@ The app pairs an accessible, Claude-built React + TypeScript frontend (supportin
 ├── tsconfig.json                   # TypeScript config
 ├── src/                            # Claude-built React frontend (Source of Truth)
 │   ├── App.tsx                     # Main application layout, components & routes
-│   ├── api.ts                      # Network client layer (mock fallback toggle)
+│   ├── api.ts                      # Network client layer
+│   ├── account.tsx                 # Signup/login and account settings
 │   ├── i18n.tsx                    # Bilingual provider & currency/date formatters
 │   ├── index.css                   # Tailwind v4 import & typography
 │   ├── main.tsx                    # Entrypoint
 │   ├── mock.ts                     # Stand-in mock backend
 │   ├── types.ts                    # TypeScript domain interfaces
 │   └── locales/
-│       ├── en.json                 # English copy dictionary (46 keys)
-│       └── hi.json                 # Hindi copy dictionary (46 keys)
+│       ├── en.json                 # English copy dictionary
+│       └── hi.json                 # Hindi copy dictionary
 └── backend/                        # Python FastAPI Backend (Steps 1-11)
     ├── .env.example                # Backend environment template
     ├── requirements.txt            # Python dependencies
@@ -89,7 +91,7 @@ npm install
 npm run dev
 ```
 The frontend will be available at [http://localhost:5173](http://localhost:5173).
-*Note: If `VITE_API_BASE_URL` is empty, the frontend runs autonomously on built-in mock data.*
+The Vite development server proxies `/api` to `http://localhost:8000` by default. For a separate backend URL, set `VITE_API_BASE_URL` in `.env`. The legacy data mock can be selected with `VITE_API_BASE_URL=mock`; authentication and settings require the backend.
 
 ### 3. Backend Server (FastAPI)
 
@@ -102,6 +104,12 @@ python backend/run_server.py
 ```
 The backend API server runs at [http://localhost:8000](http://localhost:8000). Interactive OpenAPI documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
 
+### First sign-in
+
+On first launch, create the shop's single owner account with your name, email, business details, preferred language, display currency, and a password. Passwords must be at least 12 characters and include uppercase and lowercase letters, a number, and a symbol; signup also asks you to confirm the password. The backend stores only a salted PBKDF2 password hash and issues an HTTP-only session cookie. Email/OTP verification is not enabled because this project has no email delivery service configured.
+
+After setup, use the email and password to sign in. The **Settings** page lets you edit your profile, language and display currency, change your password, export CSV/PDF reports, or sign out. Changing your password revokes other sessions. Currency selection changes display formatting only; it does not perform exchange-rate conversion.
+
 ---
 
 ## API Specifications
@@ -113,6 +121,12 @@ All JSON endpoints follow a consistent envelope structure:
 | Endpoint | Method | Purpose |
 | :--- | :---: | :--- |
 | `/api/receipts/upload` | `POST` | Upload receipt image/PDF (returns `{ "id": string }`) |
+| `/api/auth/status` | `GET` | Check whether owner setup is complete and the browser is signed in |
+| `/api/auth/setup` | `POST` | Create the one-time owner account |
+| `/api/auth/login` | `POST` | Start an owner session |
+| `/api/auth/logout` | `POST` | End the current owner session |
+| `/api/auth/profile` | `PATCH` | Update owner, business, and display preferences |
+| `/api/auth/password` | `POST` | Change password and rotate active sessions |
 | `/api/receipts/{id}/extract` | `POST` | Trigger structured Gemini extraction on uploaded receipt |
 | `/api/receipts/{id}` | `GET` | Retrieve receipt details, extracted items, and flags |
 | `/api/receipts/{id}/file` | `GET` | Stream original receipt image or PDF |
@@ -125,6 +139,9 @@ All JSON endpoints follow a consistent envelope structure:
 | `/api/dashboard/categories` | `GET` | Retrieve spending aggregated by category |
 | `/api/questions/ask` | `POST` | Ask a supported question (`{ "question": string, "lang": "en" \| "hi" }`) |
 | `/api/export/csv` | `GET` | Download confirmed expense ledger as CSV |
+| `/api/export/pdf` | `GET` | Download the payment summary as PDF |
+
+Receipt, dashboard, and export endpoints require an authenticated owner session. The health endpoint and owner setup/login endpoints remain public.
 
 ---
 
@@ -195,4 +212,3 @@ Development strictly adhered to the incremental 12-step approval workflow. All s
 - [x] **Step 9 — Formula-Safe CSV Export**: Server-side CSV streaming with formula injection protection (escaped `=`, `+`, `-`, `@`), RFC 4180 compliance.
 - [x] **Step 10 — Bilingual Interface, Accessibility & Polish**: 100% key parity (145 keys in `en.json` and `hi.json`), persistent language toggle, 48px mobile touch targets, double-submit protection.
 - [x] **Step 11 — Demo Readiness & Test Dataset**: 20 synthetic fixtures with `ground_truth.json`, seed data script, full end-to-end journey verification, 40/40 tests passing.
-
