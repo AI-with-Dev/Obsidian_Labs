@@ -104,6 +104,10 @@ python backend/run_server.py
 ```
 The backend API server runs at [http://localhost:8000](http://localhost:8000). Interactive OpenAPI documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
 
+### Streamlit Community Cloud (FastAPI backend)
+
+To host the FastAPI API on Streamlit Community Cloud, set **Main file path** to `main.py` in the repository root. This root-level ASGI entry point exposes the backend app; it does not host the React/Vite frontend, which must still be deployed separately. Configure `GEMINI_API_KEY` in Streamlit's app secrets/environment settings if receipt extraction is needed.
+
 ### First sign-in
 
 On first launch, create the shop's single owner account with your name, email, business details, preferred language, display currency, and a password. Passwords must be at least 12 characters and include uppercase and lowercase letters, a number, and a symbol; signup also asks you to confirm the password. The backend stores only a salted PBKDF2 password hash and issues an HTTP-only session cookie. Email/OTP verification is not enabled because this project has no email delivery service configured.

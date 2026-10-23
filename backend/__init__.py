@@ -1,0 +1,1 @@
+"""ShopLedger backend package."""
