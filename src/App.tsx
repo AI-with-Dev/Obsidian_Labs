@@ -3,246 +3,1096 @@ import {useI18n,money,day} from './i18n'
 import * as api from './api'
 import {CATEGORIES,Receipt,Filters,Answer} from './types'
 
-const btn='min-h-14 px-6 rounded-xl text-lg font-semibold focus-visible:outline-4 focus-visible:outline-amber-500 disabled:opacity-50 inline-flex items-center justify-center'
-const primary=`${btn} bg-emerald-800 text-white hover:bg-emerald-900`
-const ghost=`${btn} border-2 border-emerald-800 text-emerald-900 bg-white hover:bg-emerald-50`
-const field='w-full min-h-14 px-4 rounded-xl border-2 border-stone-500 bg-white text-lg disabled:bg-stone-100'
-const card='block rounded-2xl bg-white border border-stone-300 p-5'
-const h1='text-3xl font-bold mb-2'
-const h2='text-2xl font-bold mb-3'
+// Reusable SVG Icons for clear, simple visual guidance
+function StoreIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><circle cx="12" cy="12" r="1"/></svg>
+}
+function WalletIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+}
+function CheckCircleIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+}
+function ClockIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+}
+function PlusIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+}
+function ReceiptIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>
+}
+function ArrowRightIcon({className="w-4 h-4"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+}
+function SparklesIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+}
+function DownloadIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+}
+function SearchIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+}
+function UploadCloudIcon({className="w-8 h-8"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+}
+
+// Design system tokens matching the warm cream & emerald green reference
+const btn = 'min-h-[50px] px-5 sm:px-6 rounded-2xl text-base sm:text-lg font-semibold focus-visible:outline-4 focus-visible:outline-emerald-500 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
+const primary = `${btn} bg-emerald-700 text-white hover:bg-emerald-800 shadow-sm shadow-emerald-900/10`
+const prominentBtn = `${btn} bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-700/25 text-lg font-bold py-3.5`
+const ghost = `${btn} border border-stone-300 text-stone-800 bg-white hover:bg-stone-50 hover:border-emerald-700/40 shadow-xs`
+const field = 'w-full min-h-[50px] px-4 rounded-xl border border-stone-300 bg-white text-base sm:text-lg text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:bg-stone-100 disabled:text-stone-500 transition-all'
+const card = 'block rounded-2xl sm:rounded-3xl bg-white border border-stone-200/90 shadow-xs hover:shadow-sm transition-all p-5 sm:p-6'
+const h1 = 'text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 mb-1'
+const h2 = 'text-xl sm:text-2xl font-bold tracking-tight text-stone-900 mb-4'
+
+// Subtle category pill colors for easy recognition
+const catColors: Record<string, string> = {
+  inventory: 'bg-emerald-50 text-emerald-800 border-emerald-200/70',
+  packaging: 'bg-amber-50 text-amber-800 border-amber-200/70',
+  transport: 'bg-blue-50 text-blue-800 border-blue-200/70',
+  utilities: 'bg-teal-50 text-teal-800 border-teal-200/70',
+  rent: 'bg-purple-50 text-purple-800 border-purple-200/70',
+  repairs: 'bg-rose-50 text-rose-800 border-rose-200/70',
+  other: 'bg-stone-100 text-stone-700 border-stone-200/70',
+}
 
 function useHash(){
-  const get=()=>location.hash.slice(1)||'/'
-  const [h,s]=useState(get)
-  useEffect(()=>{const f=()=>{s(get());scrollTo(0,0)};addEventListener('hashchange',f);return()=>removeEventListener('hashchange',f)},[])
+  const get = () => location.hash.slice(1) || '/'
+  const [h, s] = useState(get)
+  useEffect(() => {
+    const f = () => { s(get()); scrollTo(0, 0) }
+    addEventListener('hashchange', f)
+    return () => removeEventListener('hashchange', f)
+  }, [])
   return h
 }
-function useLoad<T>(fn:()=>Promise<T>,deps:unknown[]){
-  const [s,set]=useState<{d?:T;e?:boolean;l:boolean}>({l:true})
+
+function useLoad<T>(fn: () => Promise<T>, deps: unknown[]){
+  const [s, set] = useState<{ d?: T; e?: boolean; l: boolean }>({ l: true })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const run=useCallback(()=>{set(p=>({...p,e:false,l:true}));fn().then(d=>set({d,l:false}),()=>set({e:true,l:false}))},deps)
-  useEffect(run,[run])
-  return {...s,run}
+  const run = useCallback(() => {
+    set(p => ({ ...p, e: false, l: true }))
+    fn().then(
+      d => set({ d, l: false }),
+      () => set({ e: true, l: false })
+    )
+  }, deps)
+  useEffect(run, [run])
+  return { ...s, run }
 }
-function State({l,e,run,children}:{l:boolean;e?:boolean;run:()=>void;children:ReactNode}){
-  const {t}=useI18n()
-  if(l)return <p role="status" className="text-xl py-8">{t('common.loading')}</p>
-  if(e)return <div role="alert" className={card}><p className="text-xl mb-4">{t('common.error')}</p><button className={primary} onClick={run}>{t('common.retry')}</button></div>
+
+function State({ l, e, run, children }: { l: boolean; e?: boolean; run: () => void; children: ReactNode }){
+  const { t } = useI18n()
+  if (l) return (
+    <div role="status" className="flex flex-col items-center justify-center py-16 gap-3 text-stone-500">
+      <div className="w-10 h-10 border-3 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+      <p className="text-lg font-medium">{t('common.loading')}</p>
+    </div>
+  )
+  if (e) return (
+    <div role="alert" className={`${card} text-center py-8 border-red-200 bg-red-50/50 max-w-lg mx-auto`}>
+      <p className="text-lg font-medium text-stone-800 mb-4">{t('common.error')}</p>
+      <button className={primary} onClick={run}>{t('common.retry')}</button>
+    </div>
+  )
   return <>{children}</>
 }
-const icon={draft:'✎',confirmed:'✓',duplicate:'⚠'}
-function Badge({s}:{s:Receipt['status']}){
-  const {t}=useI18n()
-  return <span className="inline-flex gap-1 rounded-full border-2 border-stone-700 bg-stone-50 px-3 text-base font-semibold"><span aria-hidden>{icon[s]}</span>{t('status.'+s)}</span>
+
+function Badge({ s }: { s: Receipt['status'] }){
+  const { t } = useI18n()
+  if (s === 'confirmed') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/80 bg-emerald-50 px-3 py-1 text-xs sm:text-sm font-semibold text-emerald-800">
+        <CheckCircleIcon className="w-3.5 h-3.5" />
+        {t('status.confirmed')}
+      </span>
+    )
+  }
+  if (s === 'duplicate') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-300/80 bg-rose-50 px-3 py-1 text-xs sm:text-sm font-semibold text-rose-800">
+        <span aria-hidden className="font-bold">⚠</span>
+        {t('status.duplicate')}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-50 px-3 py-1 text-xs sm:text-sm font-semibold text-amber-800">
+      <ClockIcon className="w-3.5 h-3.5" />
+      {t('status.draft')}
+    </span>
+  )
 }
-function RList({rs}:{rs:Receipt[]}){
-  const {t,lang}=useI18n()
-  if(!rs.length)return <p className="text-lg">{t('lg.empty')}</p>
-  return <ul className="space-y-3">{rs.map(r=><li key={r.id}>
-    <a href={`#/receipt/${r.id}`} className={`${card} flex flex-wrap items-center justify-between gap-2 hover:border-emerald-800`}>
-      <span><b className="block text-xl">{r.vendor||'—'}</b><span className="text-stone-700">{r.date?day(r.date,lang):'—'} · {t('cat.'+r.category)}</span></span>
-      <span className="text-right"><b className="block text-xl">{r.total==null?'—':money(r.total,lang,r.currency)}</b>{r.status!=='confirmed'&&<Badge s={r.status}/>}</span>
-    </a></li>)}</ul>
+
+function RList({ rs }: { rs: Receipt[] }){
+  const { t, lang } = useI18n()
+  if (!rs.length) return (
+    <div className={`${card} text-center py-8 text-stone-500`}>
+      <ReceiptIcon className="w-10 h-10 mx-auto text-stone-300 mb-2" />
+      <p className="text-base sm:text-lg">{t('lg.empty')}</p>
+    </div>
+  )
+  return (
+    <ul className="space-y-3">
+      {rs.map(r => (
+        <li key={r.id}>
+          <a
+            href={`#/receipt/${r.id}`}
+            className={`${card} flex flex-wrap items-center justify-between gap-3 hover:border-emerald-700/60 hover:shadow-md transition-all group`}
+          >
+            <div className="flex items-center gap-3.5 min-w-[200px]">
+              <div className="w-11 h-11 rounded-2xl bg-stone-100 group-hover:bg-emerald-50 text-stone-600 group-hover:text-emerald-700 flex items-center justify-center transition-colors shrink-0">
+                <ReceiptIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <b className="block text-base sm:text-lg text-stone-900 group-hover:text-emerald-900 transition-colors">
+                  {r.vendor || '—'}
+                </b>
+                <div className="flex items-center flex-wrap gap-2 text-sm text-stone-500 mt-0.5">
+                  <span>{r.date ? day(r.date, lang) : '—'}</span>
+                  <span>•</span>
+                  <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${catColors[r.category] || catColors.other}`}>
+                    {t('cat.' + r.category)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="text-right flex items-center gap-3 ml-auto">
+              <div>
+                <b className="block text-lg sm:text-xl font-bold text-stone-900">
+                  {r.total == null ? '—' : money(r.total, lang, r.currency)}
+                </b>
+                <div className="mt-0.5">
+                  <Badge s={r.status} />
+                </div>
+              </div>
+              <div className="text-stone-400 group-hover:text-emerald-700 transition-colors hidden sm:block">
+                <ArrowRightIcon className="w-5 h-5" />
+              </div>
+            </div>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
 }
-function Rows({rows}:{rows:{label:string;amount:number;href:string}[]}){
-  const {lang}=useI18n()
-  return <ul className="space-y-2">{rows.map(r=><li key={r.label}><a href={r.href} className={`${card} flex justify-between gap-3 text-lg hover:border-emerald-800`}><span>{r.label}</span><b>{money(r.amount,lang)}</b></a></li>)}</ul>
+
+function CategoryBreakdown({ rows, total }: { rows: { label: string; amount: number; href: string }[]; total: number }){
+  const { lang } = useI18n()
+  if (!rows.length) return null
+  return (
+    <div className="space-y-2.5">
+      {rows.map(r => {
+        const pct = total > 0 ? Math.round((r.amount / total) * 100) : 0
+        return (
+          <a
+            key={r.label}
+            href={r.href}
+            className={`${card} p-4 sm:p-5 hover:border-emerald-700/50 hover:shadow-sm transition-all group block`}
+          >
+            <div className="flex justify-between items-center gap-2 mb-2 text-base">
+              <span className="font-semibold text-stone-800 group-hover:text-emerald-800 transition-colors">{r.label}</span>
+              <span className="font-bold text-stone-900">{money(r.amount, lang)}</span>
+            </div>
+            <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-emerald-600 group-hover:bg-emerald-700 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(pct, 100)}%` }}
+              />
+            </div>
+            <span className="text-xs text-stone-500 mt-1 block">{pct}% of total</span>
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
+function TopVendorsList({ rows }: { rows: { label: string; amount: number; href: string }[] }){
+  const { lang } = useI18n()
+  if (!rows.length) return null
+  return (
+    <ul className="space-y-2.5">
+      {rows.map((r, idx) => (
+        <li key={r.label}>
+          <a
+            href={r.href}
+            className={`${card} p-4 sm:p-5 flex items-center justify-between gap-3 text-base hover:border-emerald-700/50 hover:shadow-sm transition-all group`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-emerald-50 text-stone-700 group-hover:text-emerald-800 font-bold text-xs flex items-center justify-center transition-colors">
+                #{idx + 1}
+              </span>
+              <span className="font-semibold text-stone-800 group-hover:text-emerald-800 transition-colors">{r.label}</span>
+            </div>
+            <b className="font-bold text-stone-900">{money(r.amount, lang)}</b>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 function Home(){
-  const {t,lang}=useI18n()
-  const q=useLoad(()=>Promise.all([api.summary(),api.categories(),api.list({status:'pending'})]),[])
-  const s=q.d?.[0],c=q.d?.[1],p=q.d?.[2]
-  return <State {...q}>{s&&c&&p&&<div className="space-y-8">
-    <h1 className={h1}>{t('home.title')}</h1>
-    {s.confirmedCount===0&&<div className={card}><p className="mb-4 text-xl">{t('home.empty')}</p><a href="#/upload" className={primary}>{t('home.add')}</a></div>}
-    <div className="grid gap-4 sm:grid-cols-3">
-      <div className={card}><p>{t('home.spent')}</p><p className="text-3xl font-bold">{money(s.totalSpent,lang)}</p></div>
-      <a href="#/ledger" className={`${card} hover:border-emerald-800`}><p>{t('home.count')}</p><p className="text-3xl font-bold">{s.confirmedCount}</p></a>
-      <div className={card}><p>{t('home.review')}</p><p className="text-3xl font-bold">{s.reviewCount}</p></div>
-    </div>
-    <section><h2 className={h2}>{t('home.waiting')}</h2>{p.length?<RList rs={p}/>:<p className="text-lg">{t('home.none')}</p>}</section>
-    <section><h2 className={h2}>{t('home.cats')}</h2><Rows rows={c.map(x=>({label:t('cat.'+x.category),amount:x.amount,href:`#/ledger?category=${x.category}`}))}/></section>
-    <section><h2 className={h2}>{t('home.vendors')}</h2><Rows rows={s.topVendors.map(v=>({label:v.vendor,amount:v.amount,href:`#/ledger?vendor=${encodeURIComponent(v.vendor)}`}))}/></section>
-  </div>}</State>
+  const { t, lang } = useI18n()
+  const q = useLoad(() => Promise.all([
+    api.summary(),
+    api.categories(),
+    api.list({ status: 'pending' }),
+    api.list({ status: 'confirmed' })
+  ]), [])
+  const s = q.d?.[0], c = q.d?.[1], p = q.d?.[2], confirmed = q.d?.[3]
+
+  return (
+    <State {...q}>
+      {s && c && p && (
+        <div className="space-y-8">
+          {/* Welcoming Dashboard Greeting & Prominent Action Button */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-emerald-800 font-semibold text-sm mb-1">
+                <StoreIcon className="w-4 h-4" />
+                <span>{t('home.greeting')}</span>
+              </div>
+              <h1 className={h1}>{t('home.title')}</h1>
+              <p className="text-stone-600 text-sm sm:text-base">
+                {day(new Date().toISOString(), lang)}
+              </p>
+            </div>
+            <div>
+              <a href="#/upload" className={prominentBtn}>
+                <PlusIcon className="w-5 h-5" />
+                <span>{t('home.add')}</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Empty state prompt if 0 confirmed receipts */}
+          {s.confirmedCount === 0 && (
+            <div className={`${card} border-emerald-200 bg-emerald-50/40 p-6 sm:p-8 text-center max-w-xl mx-auto`}>
+              <ReceiptIcon className="w-12 h-12 mx-auto text-emerald-700 mb-3" />
+              <p className="mb-4 text-lg font-medium text-stone-800">{t('home.empty')}</p>
+              <a href="#/upload" className={primary}>
+                <PlusIcon className="w-5 h-5" />
+                {t('home.add')}
+              </a>
+            </div>
+          )}
+
+          {/* Key Stat Cards: 1 Prominent Dark-Green Card + 2 Smaller Cards */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            {/* Prominent Dark-Green Card Showing Total Spending */}
+            <div className="sm:col-span-1 rounded-2xl sm:rounded-3xl p-6 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white shadow-lg shadow-emerald-950/20 border border-emerald-800/40 flex flex-col justify-between relative overflow-hidden">
+              <div className="relative z-10">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="w-10 h-10 rounded-2xl bg-emerald-800/80 border border-emerald-600/40 text-emerald-200 flex items-center justify-center">
+                    <WalletIcon className="w-5 h-5" />
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-800/90 text-emerald-200 border border-emerald-700/50">
+                    {t('home.verifiedBadge')}
+                  </span>
+                </div>
+                <p className="text-emerald-200/90 text-sm font-medium">
+                  {t('home.spent')}
+                </p>
+                <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5">
+                  {money(s.totalSpent, lang)}
+                </p>
+              </div>
+              <div className="relative z-10 pt-4 mt-2 border-t border-emerald-800/50 flex items-center justify-between text-xs text-emerald-200/80">
+                <span>{s.confirmedCount} {t('home.count').toLowerCase()}</span>
+                <a href="#/ledger" className="underline hover:text-white transition-colors">
+                  {t('home.allConfirmed')} →
+                </a>
+              </div>
+            </div>
+
+            {/* Smaller Card 1: Confirmed Receipts */}
+            <a
+              href="#/ledger"
+              className={`${card} flex flex-col justify-between hover:border-emerald-600/60 hover:shadow-md transition-all group`}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200/70 flex items-center justify-center">
+                    <CheckCircleIcon className="w-5 h-5" />
+                  </span>
+                  <ArrowRightIcon className="w-4 h-4 text-stone-400 group-hover:text-emerald-700 transition-colors" />
+                </div>
+                <p className="text-stone-600 text-sm font-semibold">{t('home.count')}</p>
+                <p className="text-3xl sm:text-4xl font-extrabold text-stone-900 group-hover:text-emerald-800 transition-colors mt-1">
+                  {s.confirmedCount}
+                </p>
+              </div>
+              <span className="text-xs font-medium text-emerald-700 mt-4 block">
+                {t('home.viewAll')} →
+              </span>
+            </a>
+
+            {/* Smaller Card 2: Receipts Awaiting Review */}
+            <div
+              className={`${card} flex flex-col justify-between hover:border-amber-500/60 hover:shadow-md transition-all`}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-800 border border-amber-200/70 flex items-center justify-center">
+                    <ClockIcon className="w-5 h-5" />
+                  </span>
+                  {s.reviewCount > 0 ? (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                      {t('home.pendingBadge')}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      {t('home.allClear')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-stone-600 text-sm font-semibold">{t('home.review')}</p>
+                <p className="text-3xl sm:text-4xl font-extrabold text-stone-900 mt-1">
+                  {s.reviewCount}
+                </p>
+              </div>
+              {s.reviewCount > 0 ? (
+                <a href="#waiting-section" className="text-xs font-medium text-amber-800 mt-4 block underline">
+                  {t('home.reviewNow')} ↓
+                </a>
+              ) : (
+                <span className="text-xs text-stone-500 mt-4 block">{t('home.none')}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Receipts Waiting for Review Section (if any) */}
+          <section id="waiting-section" className="scroll-mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className={h2}>{t('home.waiting')}</h2>
+              </div>
+              {p.length > 0 && (
+                <span className="text-xs sm:text-sm font-bold bg-amber-100 text-amber-900 px-3 py-1 rounded-full">
+                  {p.length} {t('home.review').toLowerCase()}
+                </span>
+              )}
+            </div>
+            {p.length ? (
+              <RList rs={p} />
+            ) : (
+              <div className={`${card} text-center py-6 text-stone-600 bg-stone-50/70`}>
+                <CheckCircleIcon className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+                <p className="text-base sm:text-lg font-medium">{t('home.none')}</p>
+              </div>
+            )}
+          </section>
+
+          {/* Clean, Readable Recent-Activity Section */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className={h2}>{t('home.recent')}</h2>
+              </div>
+              <a href="#/ledger" className="text-sm font-semibold text-emerald-800 hover:underline">
+                {t('home.viewAll')} →
+              </a>
+            </div>
+            {confirmed && confirmed.length > 0 ? (
+              <RList rs={confirmed.slice(0, 5)} />
+            ) : (
+              <div className={`${card} text-center py-6 text-stone-500`}>
+                <p className="text-base">{t('home.empty')}</p>
+              </div>
+            )}
+          </section>
+
+          {/* Spending Analytics: Categories & Top Vendors */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <section>
+              <h2 className={h2}>{t('home.cats')}</h2>
+              <CategoryBreakdown
+                rows={c.map(x => ({
+                  label: t('cat.' + x.category),
+                  amount: x.amount,
+                  href: `#/ledger?category=${x.category}`
+                }))}
+                total={s.totalSpent}
+              />
+            </section>
+            <section>
+              <h2 className={h2}>{t('home.vendors')}</h2>
+              <TopVendorsList
+                rows={s.topVendors.map(v => ({
+                  label: v.vendor,
+                  amount: v.amount,
+                  href: `#/ledger?vendor=${encodeURIComponent(v.vendor)}`
+                }))}
+              />
+            </section>
+          </div>
+        </div>
+      )}
+    </State>
+  )
 }
 
-const OK=['image/jpeg','image/png','application/pdf']
+const OK = ['image/jpeg', 'image/png', 'application/pdf']
 function Upload(){
-  const {t}=useI18n()
-  const [file,setFile]=useState<File|null>(null)
-  const [st,setSt]=useState<'idle'|'up'|'read'|'done'|'err'>('idle')
-  const [msg,setMsg]=useState(''),[id,setId]=useState('')
-  const busy=st==='up'||st==='read'
-  const pick=(f?:File)=>{setFile(null);setMsg('');setSt('idle');if(!f)return;if(!OK.includes(f.type)){setMsg(t('up.badType'));setSt('err');return}setFile(f)}
-  const send=async()=>{
-    if(!file||busy)return
-    try{setSt('up');const r=await api.upload(file);setSt('read');await api.extract(r.id);setId(r.id);setSt('done')}
-    catch{setMsg(t('up.fail'));setSt('err')}
+  const { t } = useI18n()
+  const [file, setFile] = useState<File | null>(null)
+  const [st, setSt] = useState<'idle' | 'up' | 'read' | 'done' | 'err'>('idle')
+  const [msg, setMsg] = useState(''), [id, setId] = useState('')
+  const busy = st === 'up' || st === 'read'
+
+  const pick = (f?: File) => {
+    setFile(null); setMsg(''); setSt('idle')
+    if (!f) return
+    if (!OK.includes(f.type)) {
+      setMsg(t('up.badType'))
+      setSt('err')
+      return
+    }
+    setFile(f)
   }
-  return <div className="space-y-6 max-w-2xl">
-    <h1 className={h1}>{t('up.title')}</h1>
-    <p className="text-xl">{t('up.help')}</p>
-    <label className={`${ghost} cursor-pointer w-full`}>{t('up.choose')}
-      <input type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" className="sr-only" disabled={busy} onChange={e=>pick(e.target.files?.[0])}/></label>
-    {file&&<p className={card}><span className="block text-stone-700">{t('up.selected')}</span><b className="break-all">{file.name}</b></p>}
-    <div role="status" aria-live="polite" className="text-xl">
-      {st==='up'&&t('up.sending')}{st==='read'&&t('up.reading')}
-      {st==='done'&&<span>✓ {t('up.done')}</span>}
+
+  const send = async () => {
+    if (!file || busy) return
+    try {
+      setSt('up')
+      const r = await api.upload(file)
+      setSt('read')
+      await api.extract(r.id)
+      setId(r.id)
+      setSt('done')
+    } catch {
+      setMsg(t('up.fail'))
+      setSt('err')
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <div>
+        <h1 className={h1}>{t('up.title')}</h1>
+        <p className="text-stone-600 text-base sm:text-lg">{t('up.help')}</p>
+      </div>
+
+      <div className={`${card} border-2 border-dashed border-stone-300 hover:border-emerald-600/70 p-8 text-center transition-all`}>
+        <UploadCloudIcon className="w-12 h-12 mx-auto text-emerald-700 mb-3" />
+        <label className={`${prominentBtn} cursor-pointer inline-flex`}>
+          <span>{t('up.choose')}</span>
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+            className="sr-only"
+            disabled={busy}
+            onChange={e => pick(e.target.files?.[0])}
+          />
+        </label>
+        <p className="text-xs text-stone-500 mt-3">JPG, PNG, PDF up to 10MB</p>
+      </div>
+
+      {file && (
+        <div className={`${card} flex items-center justify-between gap-3 bg-emerald-50/40 border-emerald-200`}>
+          <div className="flex items-center gap-3">
+            <ReceiptIcon className="w-6 h-6 text-emerald-800 shrink-0" />
+            <div>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-emerald-800">{t('up.selected')}</span>
+              <b className="break-all text-base sm:text-lg text-stone-900">{file.name}</b>
+            </div>
+          </div>
+          {!busy && st !== 'done' && (
+            <button className="text-stone-400 hover:text-stone-700 text-lg px-2" onClick={() => setFile(null)}>✕</button>
+          )}
+        </div>
+      )}
+
+      <div role="status" aria-live="polite">
+        {busy && (
+          <div className={`${card} p-5 space-y-3 bg-stone-50`}>
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+              <p className="text-base sm:text-lg font-medium text-stone-800">
+                {st === 'up' && t('up.sending')}
+                {st === 'read' && t('up.reading')}
+              </p>
+            </div>
+            <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
+              <div className="bg-emerald-600 h-2 rounded-full animate-pulse w-3/4" />
+            </div>
+          </div>
+        )}
+        {st === 'done' && (
+          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 font-semibold flex items-center gap-2">
+            <CheckCircleIcon className="w-5 h-5 text-emerald-700" />
+            <span>{t('up.done')}</span>
+          </div>
+        )}
+        {st === 'err' && (
+          <p role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900 font-medium">
+            ⚠ {msg}
+          </p>
+        )}
+      </div>
+
+      {st === 'done' ? (
+        <a href={`#/receipt/${id}`} className={`${prominentBtn} w-full`}>
+          <span>{t('up.next')}</span>
+          <ArrowRightIcon className="w-5 h-5" />
+        </a>
+      ) : (
+        <button className={`${primary} w-full py-3.5`} disabled={!file || busy} onClick={send}>
+          {st === 'err' && file ? t('common.retry') : t('up.send')}
+        </button>
+      )}
     </div>
-    {st==='err'&&<p role="alert" className="rounded-xl border-2 border-red-800 bg-red-50 p-4 text-lg">⚠ {msg}</p>}
-    {busy&&<progress className="w-full h-3" aria-hidden/>}
-    {st==='done'?<a href={`#/receipt/${id}`} className={`${primary} w-full`}>{t('up.next')} →</a>
-     :<button className={`${primary} w-full`} disabled={!file||busy} onClick={send}>{st==='err'&&file?t('common.retry'):t('up.send')}</button>}
-  </div>
+  )
 }
 
-function F({label,warn,children}:{label:string;warn?:boolean;children:ReactNode}){
-  const {t}=useI18n()
-  return <label className="block"><span className="mb-1 block text-lg font-semibold">{label}</span>{children}
-    {warn&&<span className="mt-1 block font-semibold text-amber-900">⚠ {t('rv.unclear')}</span>}</label>
-}
-function Side({x,h}:{x:Receipt;h:string}){
-  const {lang,t}=useI18n()
-  return <div className={card}><h3 className="mb-2 text-xl font-bold">{h}</h3>
-    <img src={x.fileUrl} alt="" className="mb-3 max-h-48 rounded-lg border"/>
-    <p><b>{x.vendor||'—'}</b></p><p>{x.date?day(x.date,lang):'—'}</p><p>{x.total==null?'—':money(x.total,lang,x.currency)}</p><p>{t('cat.'+x.category)}</p></div>
-}
-function Dup({r,busy,onDiscard,onKeep}:{r:Receipt;busy:boolean;onDiscard:()=>void;onKeep:()=>void}){
-  const {t}=useI18n()
-  const o=useLoad(()=>api.get(r.duplicateOfId!),[r.duplicateOfId])
-  return <section className="space-y-4">
-    <h2 className={h2}>{t('dp.title')}</h2><p className="text-xl">{t('dp.help')}</p>
-    <State {...o}><div className="grid gap-4 sm:grid-cols-2"><Side x={r} h={t('dp.new')}/>{o.d&&<Side x={o.d} h={t('dp.old')}/>}</div></State>
-    <div className="flex flex-col gap-3 sm:flex-row">
-      <button className={ghost} disabled={busy} onClick={onDiscard}>{t('dp.discard')}</button>
-      <button className={primary} disabled={busy} onClick={onKeep}>{t('dp.keep')}</button></div>
-  </section>
+function F({ label, warn, children }: { label: string; warn?: boolean; children: ReactNode }){
+  const { t } = useI18n()
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm sm:text-base font-semibold text-stone-800">{label}</span>
+      {children}
+      {warn && (
+        <span className="mt-1.5 flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-amber-900 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+          <span>⚠</span>
+          {t('rv.unclear')}
+        </span>
+      )}
+    </label>
+  )
 }
 
-function ReceiptPage({id}:{id:string}){
-  const {t}=useI18n()
-  const q=useLoad(()=>api.get(id),[id])
-  const [f,setF]=useState<Receipt|null>(null)
-  const [note,setNote]=useState(''),[busy,setBusy]=useState(false),[err,setErr]=useState(false),[gone,setGone]=useState(false)
-  useEffect(()=>{if(q.d)setF(q.d)},[q.d])
-  const set=(p:Partial<Receipt>)=>setF(x=>x&&{...x,...p})
-  const act=async(fn:()=>Promise<Receipt|void>,ok:string)=>{
-    if(busy)return
-    setBusy(true);setErr(false);setNote('')
-    try{const r=await fn();if(r)setF(r);setNote(t(ok))}catch{setErr(true)}
+function Side({ x, h }: { x: Receipt; h: string }){
+  const { lang, t } = useI18n()
+  return (
+    <div className={`${card} space-y-2`}>
+      <h3 className="text-lg font-bold text-stone-900 pb-1 border-b border-stone-100">{h}</h3>
+      <img src={x.fileUrl} alt="" className="w-full max-h-48 object-contain rounded-xl border border-stone-200 bg-stone-50" />
+      <p className="text-base"><b>{x.vendor || '—'}</b></p>
+      <p className="text-sm text-stone-600">{x.date ? day(x.date, lang) : '—'}</p>
+      <p className="text-lg font-bold text-emerald-900">{x.total == null ? '—' : money(x.total, lang, x.currency)}</p>
+      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${catColors[x.category] || catColors.other}`}>
+        {t('cat.' + x.category)}
+      </span>
+    </div>
+  )
+}
+
+function Dup({ r, busy, onDiscard, onKeep }: { r: Receipt; busy: boolean; onDiscard: () => void; onKeep: () => void }){
+  const { t } = useI18n()
+  const o = useLoad(() => api.get(r.duplicateOfId!), [r.duplicateOfId])
+  return (
+    <section className="space-y-4">
+      <div className="rounded-2xl border border-rose-300 bg-rose-50/60 p-4 sm:p-5">
+        <h2 className="text-xl font-bold text-rose-950 flex items-center gap-2">
+          <span>⚠</span> {t('dp.title')}
+        </h2>
+        <p className="text-stone-700 text-sm sm:text-base mt-1">{t('dp.help')}</p>
+      </div>
+      <State {...o}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Side x={r} h={t('dp.new')} />
+          {o.d && <Side x={o.d} h={t('dp.old')} />}
+        </div>
+      </State>
+      <div className="flex flex-col gap-3 sm:flex-row pt-2">
+        <button className={`${ghost} border-rose-300 text-rose-900 hover:bg-rose-50`} disabled={busy} onClick={onDiscard}>
+          {t('dp.discard')}
+        </button>
+        <button className={primary} disabled={busy} onClick={onKeep}>
+          {t('dp.keep')}
+        </button>
+      </div>
+    </section>
+  )
+}
+
+function ReceiptPage({ id }: { id: string }){
+  const { t } = useI18n()
+  const q = useLoad(() => api.get(id), [id])
+  const [f, setF] = useState<Receipt | null>(null)
+  const [note, setNote] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState(false), [gone, setGone] = useState(false)
+
+  useEffect(() => { if (q.d) setF(q.d) }, [q.d])
+  const set = (p: Partial<Receipt>) => setF(x => x && { ...x, ...p })
+
+  const act = async (fn: () => Promise<Receipt | void>, ok: string) => {
+    if (busy) return
+    setBusy(true); setErr(false); setNote('')
+    try {
+      const r = await fn()
+      if (r) setF(r)
+      setNote(t(ok))
+    } catch {
+      setErr(true)
+    }
     setBusy(false)
   }
-  const ro=f?.status==='confirmed'
-  return <State {...q}>{gone?<div className="space-y-4"><p className="text-xl">✓ {t('rv.gone')}</p><a className={primary} href="#/">{t('rv.goHome')}</a></div>
-  :f&&<div className="space-y-6">
-    <a href="#/" className="text-lg underline">{t('common.back')}</a>
-    <div className="flex flex-wrap items-center gap-3"><h1 className="text-3xl font-bold">{ro?t('rv.titleDone'):t('rv.title')}</h1><Badge s={f.status}/></div>
-    {f.status==='duplicate'?<Dup r={f} busy={busy}
-      onDiscard={()=>act(async()=>{await api.discard(id);setGone(true)},'rv.gone')}
-      onKeep={()=>act(()=>api.keepSeparate(id),'dp.kept')}/>:<>
-    {!ro&&<p className="rounded-xl border-2 border-amber-600 bg-amber-50 p-4 text-lg">⚠ {t('rv.warn')}</p>}
-    <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-      <details open className={card}><summary className="min-h-12 cursor-pointer text-xl font-semibold">{t('rv.original')}</summary>
-        {f.fileName.toLowerCase().endsWith('.pdf')?null:<img src={f.fileUrl} alt={t('rv.original')} className="my-3 w-full rounded-lg border"/>}
-        <a href={f.fileUrl} target="_blank" rel="noreferrer" className="text-lg underline">{t('rv.open')}</a></details>
-      <fieldset disabled={ro||busy} className={`${card} space-y-5`}>
-        <F label={t('rv.vendor')} warn={!ro&&(f.flags.includes('vendor')||!f.vendor)}><input className={field} value={f.vendor} onChange={e=>set({vendor:e.target.value})}/></F>
-        <F label={t('rv.date')} warn={!ro&&(f.flags.includes('date')||!f.date)}><input type="date" className={field} value={f.date} onChange={e=>set({date:e.target.value})}/></F>
-        <F label={t('rv.currency')}><select className={field} value={f.currency} onChange={e=>set({currency:e.target.value})}>{['INR','USD','EUR'].map(c=><option key={c}>{c}</option>)}</select></F>
-        <div><p className="mb-1 text-lg font-semibold">{t('rv.items')}</p><div className="space-y-3">
-          {f.items.map((it,i)=><div key={i} className="flex gap-2">
-            <input aria-label={t('rv.item')} placeholder={t('rv.item')} className={field} value={it.name} onChange={e=>set({items:f.items.map((x,j)=>j===i?{...x,name:e.target.value}:x)})}/>
-            <input aria-label={t('rv.amount')} placeholder={t('rv.amount')} type="number" inputMode="decimal" min="0" className={`${field} max-w-32`} value={it.amount} onChange={e=>set({items:f.items.map((x,j)=>j===i?{...x,amount:Number(e.target.value)}:x)})}/>
-            {!ro&&<button type="button" aria-label={t('rv.removeItem')} className={`${ghost} px-4`} onClick={()=>set({items:f.items.filter((_,j)=>j!==i)})}>✕</button>}</div>)}
-          {!ro&&<button type="button" className={ghost} onClick={()=>set({items:[...f.items,{name:'',amount:0}]})}>{t('rv.addItem')}</button>}</div></div>
-        <F label={t('rv.total')} warn={!ro&&(f.flags.includes('total')||f.total==null)}><input type="number" inputMode="decimal" min="0" className={field} value={f.total??''} onChange={e=>set({total:e.target.value===''?null:Number(e.target.value)})}/></F>
-        <F label={t('rv.category')}><select className={field} value={f.category} onChange={e=>set({category:e.target.value})}>{CATEGORIES.map(c=><option key={c} value={c}>{t('cat.'+c)}</option>)}</select></F>
-      </fieldset>
-    </div>
-    <div role="status" aria-live="polite">
-      {busy&&<p className="text-xl">{t('rv.saving')}</p>}
-      {note&&<p className="rounded-xl border-2 border-emerald-800 bg-emerald-50 p-4 text-lg">✓ {note}</p>}
-      {err&&<p role="alert" className="rounded-xl border-2 border-red-800 bg-red-50 p-4 text-lg">⚠ {t('common.error')}</p>}</div>
-    {ro?<a href="#/ledger" className={primary}>{t('rv.goLedger')}</a>:<div className="space-y-3">
-      <p className="text-lg">{t('rv.confirmHelp')}</p>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <button className={ghost} disabled={busy} onClick={()=>act(()=>api.save(f),'rv.saved')}>{t('rv.save')}</button>
-        <button className={primary} disabled={busy} onClick={()=>act(async()=>{await api.save(f);return api.confirm(id)},'rv.confirmed')}>{t('rv.confirm')}</button></div></div>}
-    </>}
-  </div>}</State>
+
+  const ro = f?.status === 'confirmed'
+
+  return (
+    <State {...q}>
+      {gone ? (
+        <div className={`${card} text-center py-12 max-w-md mx-auto space-y-4`}>
+          <CheckCircleIcon className="w-12 h-12 text-emerald-700 mx-auto" />
+          <p className="text-xl font-bold text-stone-900">{t('rv.gone')}</p>
+          <a className={primary} href="#/">{t('rv.goHome')}</a>
+        </div>
+      ) : f && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <a href="#/" className="inline-flex items-center gap-1.5 text-stone-600 hover:text-emerald-800 font-semibold text-sm">
+              <span aria-hidden>←</span> {t('common.back')}
+            </a>
+            <Badge s={f.status} />
+          </div>
+
+          <h1 className={h1}>{ro ? t('rv.titleDone') : t('rv.title')}</h1>
+
+          {f.status === 'duplicate' ? (
+            <Dup
+              r={f}
+              busy={busy}
+              onDiscard={() => act(async () => { await api.discard(id); setGone(true) }, 'rv.gone')}
+              onKeep={() => act(() => api.keepSeparate(id), 'dp.kept')}
+            />
+          ) : (
+            <>
+              {!ro && (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-4 text-amber-950 flex items-start gap-3">
+                  <span className="text-xl">⚠</span>
+                  <p className="text-sm sm:text-base font-medium">{t('rv.warn')}</p>
+                </div>
+              )}
+
+              <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+                {/* Original receipt viewer */}
+                <details open className={`${card} p-5 space-y-3`}>
+                  <summary className="cursor-pointer text-lg font-bold text-stone-900 select-none">
+                    {t('rv.original')}
+                  </summary>
+                  {f.fileName.toLowerCase().endsWith('.pdf') ? null : (
+                    <img src={f.fileUrl} alt={t('rv.original')} className="w-full max-h-[460px] object-contain rounded-xl border border-stone-200 bg-stone-50 my-2" />
+                  )}
+                  <a href={f.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-800 hover:underline">
+                    <span>{t('rv.open')}</span> ↗
+                  </a>
+                </details>
+
+                {/* Edit Form */}
+                <fieldset disabled={ro || busy} className={`${card} space-y-4`}>
+                  <F label={t('rv.vendor')} warn={!ro && (f.flags.includes('vendor') || !f.vendor)}>
+                    <input className={field} value={f.vendor} onChange={e => set({ vendor: e.target.value })} />
+                  </F>
+
+                  <F label={t('rv.date')} warn={!ro && (f.flags.includes('date') || !f.date)}>
+                    <input type="date" className={field} value={f.date} onChange={e => set({ date: e.target.value })} />
+                  </F>
+
+                  <F label={t('rv.currency')}>
+                    <select className={field} value={f.currency} onChange={e => set({ currency: e.target.value })}>
+                      {['INR', 'USD', 'EUR'].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </F>
+
+                  <div>
+                    <p className="mb-2 text-sm sm:text-base font-semibold text-stone-800">{t('rv.items')}</p>
+                    <div className="space-y-2.5">
+                      {f.items.map((it, i) => (
+                        <div key={i} className="flex gap-2">
+                          <input
+                            aria-label={t('rv.item')}
+                            placeholder={t('rv.item')}
+                            className={field}
+                            value={it.name}
+                            onChange={e => set({ items: f.items.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })}
+                          />
+                          <input
+                            aria-label={t('rv.amount')}
+                            placeholder={t('rv.amount')}
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            className={`${field} max-w-[130px]`}
+                            value={it.amount}
+                            onChange={e => set({ items: f.items.map((x, j) => j === i ? { ...x, amount: Number(e.target.value) } : x) })}
+                          />
+                          {!ro && (
+                            <button
+                              type="button"
+                              aria-label={t('rv.removeItem')}
+                              className={`${ghost} px-3 text-stone-500 hover:text-rose-700`}
+                              onClick={() => set({ items: f.items.filter((_, j) => j !== i) })}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {!ro && (
+                        <button
+                          type="button"
+                          className={`${ghost} w-full text-sm font-semibold`}
+                          onClick={() => set({ items: [...f.items, { name: '', amount: 0 }] })}
+                        >
+                          {t('rv.addItem')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <F label={t('rv.total')} warn={!ro && (f.flags.includes('total') || f.total == null)}>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      className={field}
+                      value={f.total ?? ''}
+                      onChange={e => set({ total: e.target.value === '' ? null : Number(e.target.value) })}
+                    />
+                  </F>
+
+                  <F label={t('rv.category')}>
+                    <select className={field} value={f.category} onChange={e => set({ category: e.target.value })}>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{t('cat.' + c)}</option>)}
+                    </select>
+                  </F>
+                </fieldset>
+              </div>
+
+              {/* Status and Action Buttons */}
+              <div role="status" aria-live="polite">
+                {busy && <p className="text-base text-stone-600 animate-pulse">{t('rv.saving')}</p>}
+                {note && <p className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 font-semibold">✓ {note}</p>}
+                {err && <p role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900 font-semibold">⚠ {t('common.error')}</p>}
+              </div>
+
+              {ro ? (
+                <div className="pt-2">
+                  <a href="#/ledger" className={primary}>
+                    <ArrowRightIcon className="w-5 h-5" />
+                    <span>{t('rv.goLedger')}</span>
+                  </a>
+                </div>
+              ) : (
+                <div className="space-y-3 pt-2">
+                  <p className="text-sm sm:text-base text-stone-600">{t('rv.confirmHelp')}</p>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button className={ghost} disabled={busy} onClick={() => act(() => api.save(f), 'rv.saved')}>
+                      {t('rv.save')}
+                    </button>
+                    <button
+                      className={prominentBtn}
+                      disabled={busy}
+                      onClick={() => act(async () => { await api.save(f); return api.confirm(id) }, 'rv.confirmed')}
+                    >
+                      <CheckCircleIcon className="w-5 h-5" />
+                      <span>{t('rv.confirm')}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </State>
+  )
 }
 
-function Ledger({query}:{query:string}){
-  const {t,lang}=useI18n()
-  const p=new URLSearchParams(query)
-  const blank:Filters={q:'',from:'',to:'',category:'',vendor:''}
-  const [fl,setFl]=useState<Filters>({...blank,category:p.get('category')||'',vendor:p.get('vendor')||''})
-  const [ex,setEx]=useState<'idle'|'busy'|'ok'|'err'>('idle')
-  const vendors=useLoad(()=>api.summary(),[])
-  const r=useLoad(()=>api.list({...fl,status:'confirmed'}),[JSON.stringify(fl)])
-  const up=(k:keyof Filters,v:string)=>setFl(x=>({...x,[k]:v}))
-  const doExport=async()=>{if(ex==='busy')return;setEx('busy');try{await api.exportCsv();setEx('ok')}catch{setEx('err')}}
-  const vlist=Array.from(new Set([...(vendors.d?.topVendors.map(v=>v.vendor)??[]),...(fl.vendor?[fl.vendor]:[])]))
-  return <div className="space-y-6">
-    <div><h1 className={h1}>{t('lg.title')}</h1><p className="text-xl">{t('lg.help')}</p></div>
-    <div className={`${card} grid gap-4 sm:grid-cols-2`}>
-      <F label={t('lg.search')}><input type="search" className={field} value={fl.q} onChange={e=>up('q',e.target.value)}/></F>
-      <F label={t('lg.category')}><select className={field} value={fl.category} onChange={e=>up('category',e.target.value)}><option value="">{t('cat.all')}</option>{CATEGORIES.map(c=><option key={c} value={c}>{t('cat.'+c)}</option>)}</select></F>
-      <F label={t('lg.from')}><input type="date" className={field} value={fl.from} onChange={e=>up('from',e.target.value)}/></F>
-      <F label={t('lg.to')}><input type="date" className={field} value={fl.to} onChange={e=>up('to',e.target.value)}/></F>
-      <F label={t('lg.vendor')}><select className={field} value={fl.vendor} onChange={e=>up('vendor',e.target.value)}><option value="">{t('lg.allVendors')}</option>{vlist.map(v=><option key={v}>{v}</option>)}</select></F>
-      <div className="flex items-end"><button className={ghost} onClick={()=>setFl(blank)}>{t('lg.clear')}</button></div>
+function Ledger({ query }: { query: string }){
+  const { t, lang } = useI18n()
+  const p = new URLSearchParams(query)
+  const blank: Filters = { q: '', from: '', to: '', category: '', vendor: '' }
+  const [fl, setFl] = useState<Filters>({ ...blank, category: p.get('category') || '', vendor: p.get('vendor') || '' })
+  const [ex, setEx] = useState<'idle' | 'busy' | 'ok' | 'err'>('idle')
+
+  const vendors = useLoad(() => api.summary(), [])
+  const r = useLoad(() => api.list({ ...fl, status: 'confirmed' }), [JSON.stringify(fl)])
+
+  const up = (k: keyof Filters, v: string) => setFl(x => ({ ...x, [k]: v }))
+  const doExport = async () => {
+    if (ex === 'busy') return
+    setEx('busy')
+    try {
+      await api.exportCsv()
+      setEx('ok')
+    } catch {
+      setEx('err')
+    }
+  }
+
+  const vlist = Array.from(new Set([...(vendors.d?.topVendors.map(v => v.vendor) ?? []), ...(fl.vendor ? [fl.vendor] : [])]))
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className={h1}>{t('lg.title')}</h1>
+          <p className="text-stone-600 text-sm sm:text-base">{t('lg.help')}</p>
+        </div>
+        <button className={primary} disabled={ex === 'busy'} onClick={doExport}>
+          <DownloadIcon className="w-5 h-5" />
+          <span>{t('lg.export')}</span>
+        </button>
+      </div>
+
+      <div role="status" aria-live="polite">
+        {ex === 'busy' && <p className="text-sm text-stone-600 animate-pulse">{t('lg.exporting')}</p>}
+        {ex === 'ok' && <p className="text-sm font-semibold text-emerald-800">✓ {t('lg.exportOk')}</p>}
+        {ex === 'err' && (
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-semibold text-rose-800">⚠ {t('lg.exportErr')}</p>
+            <button className={`${ghost} text-xs py-1 px-3`} onClick={doExport}>{t('common.retry')}</button>
+          </div>
+        )}
+      </div>
+
+      {/* Filter controls */}
+      <div className={`${card} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
+        <div className="sm:col-span-2 lg:col-span-1">
+          <F label={t('lg.search')}>
+            <div className="relative">
+              <input
+                type="search"
+                className={`${field} pl-10`}
+                placeholder="Search..."
+                value={fl.q}
+                onChange={e => up('q', e.target.value)}
+              />
+              <span className="absolute left-3 top-3.5 text-stone-400">
+                <SearchIcon className="w-5 h-5" />
+              </span>
+            </div>
+          </F>
+        </div>
+
+        <F label={t('lg.category')}>
+          <select className={field} value={fl.category} onChange={e => up('category', e.target.value)}>
+            <option value="">{t('cat.all')}</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{t('cat.' + c)}</option>)}
+          </select>
+        </F>
+
+        <F label={t('lg.vendor')}>
+          <select className={field} value={fl.vendor} onChange={e => up('vendor', e.target.value)}>
+            <option value="">{t('lg.allVendors')}</option>
+            {vlist.map(v => <option key={v}>{v}</option>)}
+          </select>
+        </F>
+
+        <F label={t('lg.from')}>
+          <input type="date" className={field} value={fl.from} onChange={e => up('from', e.target.value)} />
+        </F>
+
+        <F label={t('lg.to')}>
+          <input type="date" className={field} value={fl.to} onChange={e => up('to', e.target.value)} />
+        </F>
+
+        <div className="flex items-end">
+          <button className={`${ghost} w-full`} onClick={() => setFl(blank)}>
+            {t('lg.clear')}
+          </button>
+        </div>
+      </div>
+
+      {/* Filtered Receipts List */}
+      <State {...r}>
+        <RList rs={r.d ?? []} />
+      </State>
+      <span className="sr-only">{lang}</span>
     </div>
-    <State {...r}><RList rs={r.d??[]}/></State>
-    <div className="space-y-3"><button className={primary} disabled={ex==='busy'} onClick={doExport}>{t('lg.export')}</button>
-      <div role="status" aria-live="polite" className="text-lg">{ex==='busy'&&t('lg.exporting')}{ex==='ok'&&`✓ ${t('lg.exportOk')}`}{ex==='err'&&`⚠ ${t('lg.exportErr')}`}</div>
-      {ex==='err'&&<button className={ghost} onClick={doExport}>{t('common.retry')}</button>}</div>
-    <span className="sr-only">{lang}</span>
-  </div>
+  )
 }
 
 function Ask(){
-  const {t,lang}=useI18n()
-  const [q,setQ]=useState(''),[a,setA]=useState<Answer|null>(null),[l,setL]=useState(false),[e,setE]=useState(false)
-  const go=async(text:string)=>{
-    if(!text.trim()||l)return
-    setQ(text);setL(true);setE(false)
-    try{setA(await api.ask(text,lang))}catch{setE(true)}
+  const { t, lang } = useI18n()
+  const [q, setQ] = useState(''), [a, setA] = useState<Answer | null>(null), [l, setL] = useState(false), [e, setE] = useState(false)
+
+  const go = async (text: string) => {
+    if (!text.trim() || l) return
+    setQ(text); setL(true); setE(false)
+    try {
+      setA(await api.ask(text, lang))
+    } catch {
+      setE(true)
+    }
     setL(false)
   }
-  return <div className="max-w-2xl space-y-6">
-    <div><h1 className={h1}>{t('qa.title')}</h1><p className="text-xl">{t('qa.help')}</p></div>
-    <div className="flex flex-col gap-3">{[1,2,3,4,5].map(n=><button key={n} className={`${ghost} justify-start text-left`} disabled={l} onClick={()=>go(t('qa.ex'+n))}>{t('qa.ex'+n)}</button>)}</div>
-    <div className="flex flex-col gap-3 sm:flex-row"><input className={field} aria-label={t('qa.placeholder')} placeholder={t('qa.placeholder')} value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go(q)}/>
-      <button className={primary} disabled={l||!q.trim()} onClick={()=>go(q)}>{t('qa.send')}</button></div>
-    <div role="status" aria-live="polite">
-      {l&&<p className="text-xl">{t('qa.thinking')}</p>}
-      {e&&<div role="alert" className={card}><p className="mb-3 text-lg">{t('common.error')}</p><button className={primary} onClick={()=>go(q)}>{t('common.retry')}</button></div>}
-      {a&&!l&&!e&&<div className="space-y-4"><p className={`${card} text-xl font-semibold`}>{a.answer}</p>
-        {a.supported&&a.receipts.length>0&&<><h2 className="text-xl font-bold">{t('qa.sources')}</h2><RList rs={a.receipts}/></>}</div>}
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className={h1}>{t('qa.title')}</h1>
+        <p className="text-stone-600 text-sm sm:text-base">{t('qa.help')}</p>
+      </div>
+
+      {/* Example suggestion chips */}
+      <div className="space-y-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">Tap to ask</span>
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3, 4, 5].map(n => (
+            <button
+              key={n}
+              className={`${ghost} text-left text-stone-700 hover:text-emerald-900 hover:border-emerald-700/60 justify-start py-3 px-4 text-sm sm:text-base`}
+              disabled={l}
+              onClick={() => go(t('qa.ex' + n))}
+            >
+              <SparklesIcon className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>{t('qa.ex' + n)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Query input */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <input
+          className={field}
+          aria-label={t('qa.placeholder')}
+          placeholder={t('qa.placeholder')}
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && go(q)}
+        />
+        <button className={prominentBtn} disabled={l || !q.trim()} onClick={() => go(q)}>
+          <SparklesIcon className="w-5 h-5" />
+          <span>{t('qa.send')}</span>
+        </button>
+      </div>
+
+      {/* Answer result */}
+      <div role="status" aria-live="polite">
+        {l && (
+          <div className={`${card} flex items-center gap-3 py-6`}>
+            <div className="w-6 h-6 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+            <p className="text-base sm:text-lg font-medium text-stone-800">{t('qa.thinking')}</p>
+          </div>
+        )}
+        {e && (
+          <div role="alert" className={`${card} border-rose-200 bg-rose-50/50 p-6`}>
+            <p className="mb-3 text-base text-rose-900 font-semibold">{t('common.error')}</p>
+            <button className={primary} onClick={() => go(q)}>{t('common.retry')}</button>
+          </div>
+        )}
+        {a && !l && !e && (
+          <div className="space-y-6 pt-2">
+            <div className={`${card} border-emerald-200 bg-emerald-50/40 p-6`}>
+              <div className="flex items-center gap-2 text-emerald-800 font-semibold text-xs uppercase tracking-wider mb-2">
+                <SparklesIcon className="w-4 h-4" />
+                <span>ShopLedger Assistant</span>
+              </div>
+              <p className="text-lg sm:text-xl font-bold text-stone-900">{a.answer}</p>
+            </div>
+            {a.supported && a.receipts.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-lg font-bold text-stone-900">{t('qa.sources')}</h2>
+                <RList rs={a.receipts} />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
+  )
 }
 
 export default function App(){
-  const {t,lang,setLang}=useI18n()
-  const h=useHash()
-  const [path,query='']=h.split('?')
-  const rm=path.match(/^\/receipt\/(.+)$/)
-  const nav=[['/','nav.home'],['/upload','nav.upload'],['/ledger','nav.ledger'],['/ask','nav.ask']]
-  return <>
-    <header className="border-b-4 border-emerald-800 bg-white">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <a href="#/" className="text-2xl font-bold text-emerald-900">{t('app.name')}</a>
-        <button className={ghost} aria-label={t('lang.label')} onClick={()=>setLang(lang==='en'?'hi':'en')}>{t('lang.other')}</button>
-      </div>
-      <nav aria-label={t('nav.label')} className="mx-auto grid max-w-5xl grid-cols-2 gap-2 px-4 pb-3 sm:grid-cols-4">
-        {nav.map(([p,k])=><a key={p} href={'#'+p} aria-current={path===p?'page':undefined} className={`${path===p?primary:ghost} text-center`}>{t(k)}</a>)}
-      </nav>
-    </header>
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      {rm?<ReceiptPage key={rm[1]} id={rm[1]}/>:path==='/upload'?<Upload/>:path==='/ledger'?<Ledger key={h} query={query}/>:path==='/ask'?<Ask/>:<Home/>}
-    </main>
-  </>
+  const { t, lang, setLang } = useI18n()
+  const h = useHash()
+  const [path, query = ''] = h.split('?')
+  const rm = path.match(/^\/receipt\/(.+)$/)
+
+  const nav = [
+    { p: '/', k: 'nav.home', icon: StoreIcon },
+    { p: '/upload', k: 'nav.upload', icon: PlusIcon },
+    { p: '/ledger', k: 'nav.ledger', icon: ReceiptIcon },
+    { p: '/ask', k: 'nav.ask', icon: SparklesIcon }
+  ]
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-[#1C1917]">
+      {/* Top Header */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-2xs">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:py-4">
+          <a href="#/" className="flex items-center gap-2.5 text-emerald-900 group">
+            <span className="w-10 h-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-xs group-hover:bg-emerald-800 transition-colors">
+              <StoreIcon className="w-5 h-5" />
+            </span>
+            <div className="leading-tight">
+              <span className="text-xl sm:text-2xl font-extrabold tracking-tight block text-emerald-950">
+                {t('app.name')}
+              </span>
+              <span className="text-[11px] font-medium text-stone-500 uppercase tracking-wider hidden sm:block">
+                Digital Shopkeeper Ledger
+              </span>
+            </div>
+          </a>
+
+          {/* Language Switcher Button */}
+          <button
+            className="min-h-[42px] px-3.5 sm:px-4 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
+            aria-label={t('lang.label')}
+            onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
+          >
+            <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
+            <span>{t('lang.other')}</span>
+          </button>
+        </div>
+
+        {/* Navigation Tabs */}
+        <nav aria-label={t('nav.label')} className="mx-auto max-w-5xl px-4 pb-2.5">
+          <div className="grid grid-cols-4 gap-1 sm:gap-2 bg-stone-100/80 p-1 rounded-2xl border border-stone-200/70">
+            {nav.map(item => {
+              const active = path === item.p
+              const Icon = item.icon
+              return (
+                <a
+                  key={item.p}
+                  href={'#' + item.p}
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 px-2 rounded-xl text-xs sm:text-base font-semibold transition-all ${
+                    active
+                      ? 'bg-white text-emerald-900 shadow-xs border border-stone-200/80'
+                      : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
+                  <span className="truncate">{t(item.k)}</span>
+                </a>
+              )
+            })}
+          </div>
+        </nav>
+      </header>
+
+      {/* Main Content View */}
+      <main className="mx-auto max-w-5xl w-full px-4 py-6 sm:py-8 flex-1">
+        {rm ? (
+          <ReceiptPage key={rm[1]} id={rm[1]} />
+        ) : path === '/upload' ? (
+          <Upload />
+        ) : path === '/ledger' ? (
+          <Ledger key={h} query={query} />
+        ) : path === '/ask' ? (
+          <Ask />
+        ) : (
+          <Home />
+        )}
+      </main>
+
+      {/* Subtle Footer */}
+      <footer className="border-t border-stone-200/80 bg-white/60 py-6 text-center text-xs text-stone-500">
+        <div className="mx-auto max-w-5xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>© {new Date().getFullYear()} {t('app.name')} — Built for Indian retail shop owners</span>
+          <span className="text-stone-400">Offline-ready • Fast • Secure</span>
+        </div>
+      </footer>
+    </div>
+  )
 }
