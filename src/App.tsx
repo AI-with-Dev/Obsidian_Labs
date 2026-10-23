@@ -573,7 +573,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
                       className="text-emerald-700 font-bold hover:underline cursor-pointer"
                       onClick={() => setShowImage(!showImage)}
                     >
-                      {showImage ? 'Hide preview ▲' : 'Show preview ▼'}
+                      {showImage ? t('rv.hidePreview') : t('rv.showPreview')}
                     </button>
                   </div>
                   {showImage && (
@@ -784,7 +784,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
                     className="text-xs text-stone-500 hover:text-stone-800 underline"
                     onClick={applyCalculatedTotal}
                   >
-                    Auto-fill total from items
+                    {t('rv.autoFill')}
                   </button>
                 </div>
 
@@ -897,7 +897,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
                 disabled={isSubmitting}
                 onClick={onClose}
               >
-                Cancel and finish later
+                {t('rv.cancelFinishLater')}
               </button>
             </div>
           </div>
@@ -1343,7 +1343,7 @@ function Ask({ onSelectReceipt }: { onSelectReceipt: (r: Receipt) => void }){
             <div className={`${card} border-emerald-200 bg-emerald-50/40 p-6`}>
               <div className="flex items-center gap-2 text-emerald-800 font-semibold text-xs uppercase tracking-wider mb-2">
                 <SparklesIcon className="w-4 h-4" />
-                <span>ShopLedger Assistant</span>
+                <span>{t('qa.assistant')}</span>
               </div>
               <p className="text-lg sm:text-xl font-bold text-stone-900">{a.answer}</p>
             </div>
@@ -1463,8 +1463,13 @@ export default function App(){
             </div>
             <button
               onClick={() => setToastMessage(null)}
+<<<<<<< HEAD
               className="text-emerald-200 hover:text-white p-1 cursor-pointer"
               aria-label="Dismiss"
+=======
+              className="text-emerald-200 hover:text-white p-1"
+              aria-label={t('common.dismiss')}
+>>>>>>> origin/main
             >
               ✕
             </button>

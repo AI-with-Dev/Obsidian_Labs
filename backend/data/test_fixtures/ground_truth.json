@@ -1,0 +1,264 @@
+[
+  {
+    "filename": "fixture_01_clear.png",
+    "type": "clear_image",
+    "expected": {
+      "vendor": "Sharma Wholesale Traders",
+      "date": "2026-10-03",
+      "currency": "INR",
+      "total": 12450.0,
+      "category": "inventory",
+      "items_count": 3,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_02_clear.png",
+    "type": "clear_image",
+    "expected": {
+      "vendor": "JK Paper Mart",
+      "date": "2026-10-08",
+      "currency": "INR",
+      "total": 4200.0,
+      "category": "inventory",
+      "items_count": 2,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_03_clear.png",
+    "type": "clear_image",
+    "expected": {
+      "vendor": "Ganesh Packaging",
+      "date": "2026-10-06",
+      "currency": "INR",
+      "total": 1860.0,
+      "category": "packaging",
+      "items_count": 2,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_04_clear.png",
+    "type": "clear_image",
+    "expected": {
+      "vendor": "City Goods Transport",
+      "date": "2026-10-09",
+      "currency": "INR",
+      "total": 2400.0,
+      "category": "transport",
+      "items_count": 1,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_05_clear.png",
+    "type": "clear_image",
+    "expected": {
+      "vendor": "Rajasthan Power Vidyut",
+      "date": "2026-10-12",
+      "currency": "INR",
+      "total": 3120.0,
+      "category": "utilities",
+      "items_count": 1,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_06_clear.png",
+    "type": "clear_image",
+    "expected": {
+      "vendor": "Mahalaxmi Stationery Hub",
+      "date": "2026-10-11",
+      "currency": "INR",
+      "total": 2150.0,
+      "category": "inventory",
+      "items_count": 2,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_07_clear.png",
+    "type": "clear_image",
+    "expected": {
+      "vendor": "Super Office Supplies",
+      "date": "2026-10-13",
+      "currency": "INR",
+      "total": 3850.0,
+      "category": "inventory",
+      "items_count": 2,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_08_clear.png",
+    "type": "clear_image",
+    "expected": {
+      "vendor": "Apex Cartridges & Ink",
+      "date": "2026-10-14",
+      "currency": "INR",
+      "total": 1450.0,
+      "category": "repairs",
+      "items_count": 2,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_09_pdf.pdf",
+    "type": "short_pdf",
+    "expected": {
+      "vendor": "Navneet Publications India",
+      "date": "2026-10-04",
+      "currency": "INR",
+      "total": 8500.0,
+      "category": "inventory",
+      "items_count": 2,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_10_pdf.pdf",
+    "type": "short_pdf",
+    "expected": {
+      "vendor": "Kokuyo Camlin Limited",
+      "date": "2026-10-07",
+      "currency": "INR",
+      "total": 6300.0,
+      "category": "inventory",
+      "items_count": 2,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_11_pdf.pdf",
+    "type": "short_pdf",
+    "expected": {
+      "vendor": "Pidilite Wholesale Distributor",
+      "date": "2026-10-10",
+      "currency": "INR",
+      "total": 3250.0,
+      "category": "inventory",
+      "items_count": 2,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_12_pdf.pdf",
+    "type": "short_pdf",
+    "expected": {
+      "vendor": "Bharat Heavy Freight Carriers",
+      "date": "2026-10-13",
+      "currency": "INR",
+      "total": 4500.0,
+      "category": "transport",
+      "items_count": 1,
+      "uncertainty_flags": []
+    }
+  },
+  {
+    "filename": "fixture_13_blurry.png",
+    "type": "blurry_image",
+    "expected": {
+      "vendor": "Ravi General Store",
+      "date": "2026-10-10",
+      "currency": "INR",
+      "total": 780.0,
+      "category": "inventory",
+      "uncertainty_flags": [
+        "total"
+      ],
+      "notes": "Blurry thermal print requiring owner verification"
+    }
+  },
+  {
+    "filename": "fixture_14_blurry.png",
+    "type": "ambiguous_date_image",
+    "expected": {
+      "vendor": "Gupta Stationers",
+      "date": "2026-05-04",
+      "currency": "INR",
+      "total": 600.0,
+      "category": "inventory",
+      "uncertainty_flags": [
+        "date"
+      ],
+      "notes": "Ambiguous slash date format 04/05/2026"
+    }
+  },
+  {
+    "filename": "fixture_15_blurry.png",
+    "type": "faint_header_image",
+    "expected": {
+      "vendor": "City Hardware & Locksmith",
+      "date": "2026-10-14",
+      "currency": "INR",
+      "total": 940.0,
+      "category": "repairs",
+      "uncertainty_flags": [
+        "vendor"
+      ],
+      "notes": "Faint receipt header banner"
+    }
+  },
+  {
+    "filename": "fixture_16_exact_dup.png",
+    "type": "exact_sha256_duplicate",
+    "expected": {
+      "duplicate_of": "fixture_03_clear.png",
+      "vendor": "Ganesh Packaging",
+      "total": 1860.0,
+      "category": "packaging",
+      "flag": "duplicate"
+    }
+  },
+  {
+    "filename": "fixture_17_fuzzy_dup1.png",
+    "type": "fuzzy_duplicate_same_vendor_date_total",
+    "expected": {
+      "vendor": "Sharma Wholesale Traders",
+      "date": "2026-10-03",
+      "total": 12450.0,
+      "category": "inventory",
+      "conflict_with": "Sharma Wholesale Traders 2026-10-03"
+    }
+  },
+  {
+    "filename": "fixture_18_fuzzy_dup2.png",
+    "type": "fuzzy_duplicate_same_vendor_date_total",
+    "expected": {
+      "vendor": "JK Paper Mart",
+      "date": "2026-10-08",
+      "total": 4200.0,
+      "category": "inventory",
+      "conflict_with": "JK Paper Mart 2026-10-08"
+    }
+  },
+  {
+    "filename": "fixture_19_torn_total.png",
+    "type": "incomplete_missing_total",
+    "expected": {
+      "vendor": "Modern Book Depot",
+      "date": "2026-10-15",
+      "total": null,
+      "category": "inventory",
+      "uncertainty_flags": [
+        "total"
+      ],
+      "notes": "Bottom edge torn, total missing"
+    }
+  },
+  {
+    "filename": "fixture_20_missing_vendor.png",
+    "type": "incomplete_missing_vendor",
+    "expected": {
+      "vendor": null,
+      "date": "2026-10-16",
+      "total": 400.0,
+      "category": "inventory",
+      "uncertainty_flags": [
+        "vendor"
+      ],
+      "notes": "Generic cash memo without vendor header"
+    }
+  }
+]

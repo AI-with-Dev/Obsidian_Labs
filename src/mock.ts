@@ -114,6 +114,7 @@ export const m={
     topCustomers:group(r=>r.vendor).slice(0,4).map(g=>({customer:g.key,amount:g.amount}))
   }),
   categories:():CategoryTotal[]=>group(r=>r.category).map(g=>({category:g.key,amount:g.amount})),
+  csv:()=>['Vendor,Date,Category,Currency,Total',...conf().map(r=>`"${r.vendor}",${r.date},${r.category},${r.currency},${r.total}`)].join('\n'),
   pdf:()=>generatePdfDoc(),
   ask:(q:string,lang:Lang):Answer=>{
     const s=q.toLowerCase(),d=dictFor(lang),has=(...w:string[])=>w.some(x=>s.includes(x))

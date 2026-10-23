@@ -110,9 +110,14 @@ async def health_check():
 # Routers
 from backend.app.routers.receipts import router as receipts_router
 from backend.app.routers.dashboard import router as dashboard_router
+from backend.app.routers.questions import router as questions_router
+
+from backend.app.routers.export import router as export_router
 
 app.include_router(receipts_router)
 app.include_router(dashboard_router)
+app.include_router(questions_router)
+app.include_router(export_router)
 
 
 from fastapi.responses import Response
