@@ -11,6 +11,7 @@ export function I18n({children}:{children:ReactNode}){
   const [lang,set]=useState<Lang>(()=>(localStorage.getItem('lang') as Lang)||'en')
   const setLang=(l:Lang)=>{localStorage.setItem('lang',l);set(l)}
   document.documentElement.lang=lang
+  document.title = lang === 'hi' ? 'शॉपलेज़र (ShopLedger)' : 'ShopLedger'
   const t=(k:string,v:V={})=>(dict[lang][k]??k).replace(/\{(\w+)\}/g,(_,x)=>String(v[x]??''))
   return <Ctx.Provider value={{lang,setLang,t}}>{children}</Ctx.Provider>
 }

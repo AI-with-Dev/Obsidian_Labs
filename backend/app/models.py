@@ -29,6 +29,8 @@ from typing import List
 class ItemPayload(BaseModel):
     name: str = ""
     amount: float = 0.0
+    quantity: Optional[float] = 1.0
+    unitPrice: Optional[float] = None
 
 
 class ReceiptUpdatePayload(BaseModel):
@@ -38,4 +40,10 @@ class ReceiptUpdatePayload(BaseModel):
     items: Optional[List[ItemPayload]] = None
     total: Optional[float] = None
     category: Optional[str] = None
+    invoiceNumber: Optional[str] = None
+    subtotal: Optional[float] = None
+    tax: Optional[float] = None
+    discount: Optional[float] = None
+    paymentMethod: Optional[str] = None
+    notes: Optional[str] = None
 

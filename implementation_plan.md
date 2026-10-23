@@ -335,13 +335,13 @@ We will curate 20 synthetic receipt fixtures covering all edge cases, paired wit
 | **Step 2** | **Upload Service** | File upload endpoint, SHA-256 hashing, MIME validation, file storage, and upload UI connection. | **COMPLETED** |
 | **Step 3** | **Gemini Extraction** | Gemini structured prompt, Pydantic schema validation, raw response persistence, error handling, review screen connection. | **COMPLETED** |
 | **Step 4** | **Review & Confirmation** | Editable review form API, validation checks, explicit confirmation action moving record to trusted ledger. | **COMPLETED** |
-| **Step 5** | **Ledger** | Confirmed receipt listing, filtering by date/category/vendor, search by text, detailed read-only view. | **CURRENT STEP (Initiation / Awaiting Approval)** |
-| **Step 6** | **Duplicate Detection** | Exact hash and fuzzy match engine, side-by-side duplicate comparison UI, discard/keep actions. | *Awaiting Prior Step* |
-| **Step 7** | **Dashboard** | Backend-calculated financial summaries, category breakdown, top vendors, clickable receipt evidence links. | *Awaiting Prior Step* |
-| **Step 8** | **Question Answering** | Safe query dispatcher for 5 supported intents, Python calculations, Gemini language phrasing, unsupported fallback. | *Awaiting Prior Step* |
-| **Step 9** | **CSV Export** | Server-side CSV streaming of confirmed expenses with formula injection protection and download integration. | *Awaiting Prior Step* |
-| **Step 10** | **Hindi UI, Accessibility & Polish** | Full bilingual verification (English & Hindi), persistent language switch, mobile tap targets, contrast, double-submit prevention. | *Awaiting Prior Step* |
-| **Step 11** | **Demo Readiness & Verification** | Clean seed data, end-to-end user journey walkthrough, test suite execution, deployment/run instructions in README. | *Awaiting Prior Step* |
+| **Step 5** | **Ledger** | Confirmed receipt listing, filtering by date/category/vendor, search by text, detailed read-only view. | **COMPLETED** |
+| **Step 6** | **Duplicate Detection & Frontend Schema Integration** | Exact hash and fuzzy match engine, side-by-side duplicate comparison UI, discard/keep actions, schema integration with user's redesigned frontend. | **COMPLETED** |
+| **Step 7** | **Dashboard** | Backend-calculated financial summaries, category breakdown, top vendors, clickable receipt evidence links. | **COMPLETED** |
+| **Step 8** | **Question Answering** | Safe query dispatcher for 5 supported intents, Python calculations, Gemini language phrasing, unsupported fallback. | **COMPLETED** |
+| **Step 9** | **CSV Export** | Server-side CSV streaming of confirmed expenses with formula injection protection and download integration. | **COMPLETED** |
+| **Step 10** | **Hindi UI, Accessibility & Polish** | Full bilingual verification (English & Hindi), persistent language switch, mobile tap targets, contrast, double-submit prevention. | **COMPLETED** |
+| **Step 11** | **Demo Readiness & Verification** | Clean seed data, end-to-end user journey walkthrough, test suite execution, deployment/run instructions in README. | **COMPLETED** |
 
 ---
 
