@@ -117,9 +117,9 @@ app.include_router(dashboard_router)
 
 from fastapi.responses import Response
 
-@app.get("/api/export/csv")
-async def export_expenses_csv():
-    """Export confirmed receipts to CSV format."""
+@app.get("/api/export/pdf")
+async def export_payments_pdf():
+    """Export confirmed customer receipts/payments to official PDF format."""
     with get_db() as conn:
         rows = conn.execute(
             """
@@ -129,19 +129,53 @@ async def export_expenses_csv():
             ORDER BY receipt_date DESC, created_at DESC;
             """
         ).fetchall()
-        lines = ["Vendor,Date,Category,Currency,Total"]
-        for r in rows:
-            v = (r["vendor"] or "").replace('"', '""')
-            d = r["receipt_date"] or ""
-            cat = r["category"] or ""
-            cur = r["currency"] or "INR"
-            tot = f"{r['total_paise'] / 100.0:.2f}" if r["total_paise"] is not None else "0.00"
-            lines.append(f'"{v}",{d},{cat},{cur},{tot}')
-        csv_content = "\n".join(lines)
+
+        total_received = sum(r["total_paise"] or 0 for r in rows) / 100.0
+
+        stream = "BT /F1 16 Tf 50 780 Td (ShopLedger - Official Payment & Collections Summary) Tj\n"
+        stream += f"/F2 10 Tf 0 -22 Td (Export Format: Official PDF | Total Records: {len(rows)}) Tj\n"
+        stream += f"/F1 12 Tf 0 -24 Td (TOTAL MONEY RECEIVED: (+) INR {total_received:,.2f}) Tj\n"
+        stream += "/F1 10 Tf 0 -28 Td (Date         Customer / Payer                  Amount) Tj\n"
+        stream += "/F2 9 Tf 0 -5 Td (--------------------------------------------------------------------------------) Tj\n"
+
+        for r in rows[:30]:
+            d = (r["receipt_date"] or "----").ljust(12)
+            name = (r["vendor"] or "Unknown Customer")[:32].ljust(34)
+            amt = f"(+) INR {(r['total_paise'] or 0)/100.0:,.2f}"
+            line = f"{d} {name} {amt}".replace("(", "").replace(")", "").replace("\\", "")
+            stream += f"0 -18 Td ({line}) Tj\n"
+
+        stream += "ET"
+
+        o1 = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+        o2 = "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+        o3 = "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n"
+        o4 = "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n"
+        o5 = "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+        o6 = f"6 0 obj\n<< /Length {len(stream)} >>\nstream\n{stream}\nendstream\nendobj\n"
+
+        header = "%PDF-1.4\n"
+        p1 = len(header)
+        p2 = p1 + len(o1)
+        p3 = p2 + len(o2)
+        p4 = p3 + len(o3)
+        p5 = p4 + len(o4)
+        p6 = p5 + len(o5)
+        xref_pos = p6 + len(o6)
+
+        def pad(n: int) -> str:
+            return f"{n:010d} 00000 n \n"
+
+        xref = f"xref\n0 7\n0000000000 65535 f \n{pad(p1)}{pad(p2)}{pad(p3)}{pad(p4)}{pad(p5)}{pad(p6)}"
+        trailer = f"trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF"
+
+        pdf_bytes = (header + o1 + o2 + o3 + o4 + o5 + o6 + xref + trailer).encode("latin-1")
+
         return Response(
-            content=csv_content,
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=shopledger-expenses.csv"},
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=shopledger-payment-summary.pdf"},
         )
+
 
 
