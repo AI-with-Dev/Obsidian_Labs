@@ -1,0 +1,21 @@
+# Node dependencies & build artifacts
+node_modules/
+dist/
+
+# Python virtual environment & cache
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local databases and uploads
+backend/data/*.db
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store

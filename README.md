@@ -1,25 +1,146 @@
-# ShopLedger (frontend only)
-React + TypeScript + Vite + Tailwind v4. English and Hindi UI. Runs on mock data until a backend is connected.
+# ShopLedger (दुकान का खाता)
 
-## Run
+A reliable, small-business expense management and receipt auditing web application built for an Indian stationery shop owner.
+
+The app pairs an accessible, Claude-built React + TypeScript frontend (supporting full English and Hindi) with a Python FastAPI + SQLite backend powered by Google Gemini for structured receipt extraction.
+
+---
+
+## Core Architectural Principle
+
+> **AI proposes; the owner verifies; application code calculates.**  
+> Gemini is an extraction and natural-language assistance tool. Gemini is **never** authoritative for financial data, never performs monetary arithmetic, and never executes arbitrary database queries. All calculations are performed in verified application code using integer paise (`1 Rupee = 100 paise`).
+
+---
+
+## Features
+
+- **Receipt Ingestion**: Supports JPG, PNG, and short receipt-style PDFs with SHA-256 deduplication and MIME validation.
+- **Structured Gemini Extraction**: Extracts vendor, date, currency, line items, and receipt total into typed Pydantic models. Flags blurry or ambiguous fields without guessing.
+- **Side-by-Side Verification**: Original receipt image or PDF displayed directly beside an editable review form.
+- **Owner-Confirmed Ledger**: Unconfirmed receipts never impact financial metrics. Only explicit owner confirmation enters receipts into the trusted expense ledger.
+- **Duplicate Detection**: Flags exact file duplicates (SHA-256) and similar purchases (vendor + date + total matching confirmed receipts). The owner explicitly chooses to discard or keep as separate purchases.
+- **Live Spending Dashboard**: Real-time spending summaries, category spend breakdown, and top vendor charts calculated strictly from confirmed records.
+- **Safe Expense Q&A**: Answers 5 targeted financial questions with supporting receipt links using fixed safe queries.
+- **Formula-Safe CSV Export**: Generates ledger exports with formula-injection defenses (`=`, `+`, `-`, `@` escaped).
+- **Full Bilingual Support (EN / HI)**: Complete English and natural Devanagari Hindi interface with instant language switching and persistent preferences.
+
+---
+
+## Project Structure
+
+```text
+.
+├── frontend_integration_audit.md   # Complete frontend audit (Step 0)
+├── implementation_plan.md          # Full architectural plan & 12-step build order
+├── task_list.md                    # Step-by-step progress tracking
+├── README.md                       # Project documentation
+├── .env.example                    # Global environment configuration template
+├── package.json                    # Frontend dependencies & scripts
+├── vite.config.ts                  # Vite build config with Tailwind v4 & proxy
+├── tsconfig.json                   # TypeScript config
+├── src/                            # Claude-built React frontend (Source of Truth)
+│   ├── App.tsx                     # Main application layout, components & routes
+│   ├── api.ts                      # Network client layer (mock fallback toggle)
+│   ├── i18n.tsx                    # Bilingual provider & currency/date formatters
+│   ├── index.css                   # Tailwind v4 import & typography
+│   ├── main.tsx                    # Entrypoint
+│   ├── mock.ts                     # Stand-in mock backend
+│   ├── types.ts                    # TypeScript domain interfaces
+│   └── locales/
+│       ├── en.json                 # English copy dictionary (46 keys)
+│       └── hi.json                 # Hindi copy dictionary (46 keys)
+└── backend/                        # Python FastAPI Backend (Steps 1-11)
+    ├── .env.example                # Backend environment template
+    ├── requirements.txt            # Python dependencies
+    ├── app/
+    │   ├── main.py                 # FastAPI application
+    │   ├── config.py               # Settings & environment validation
+    │   ├── database.py             # SQLite WAL database & schema migrations
+    │   ├── models.py               # Pydantic schemas
+    │   ├── services/               # Extraction, duplicate, dashboard & question logic
+    │   └── routers/                # REST API route handlers
+    └── data/
+        ├── shopledger.db           # SQLite database
+        └── uploads/                # Stored receipt images & PDFs
 ```
+
+---
+
+## Quick Start & Running Locally
+
+### 1. Environment Setup
+
+Copy `.env.example` to create your local `.env` file:
+```bash
+cp .env.example .env
+```
+
+To enable live Gemini extraction in the backend, obtain an API key from Google AI Studio and configure:
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+### 2. Frontend Development Server
+
+Install frontend dependencies and start the Vite dev server:
+```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # type-checks, then builds
+npm run dev
 ```
+The frontend will be available at [http://localhost:5173](http://localhost:5173).
+*Note: If `VITE_API_BASE_URL` is empty, the frontend runs autonomously on built-in mock data.*
 
-## Connect the backend (Antigravity)
-1. Copy `.env.example` to `.env` and set `VITE_API_BASE_URL` (e.g. `http://localhost:8000`). Empty = mock mode.
-2. All network code lives in `src/api.ts`. `src/mock.ts` is the fake backend; ignore or delete it once real.
-3. Every endpoint must answer `{"success":true,"data":...,"error":null}` (the `/api/export/csv` call returns the raw CSV file).
-   - `POST /api/receipts/upload` (multipart field `file`) -> `{id}`
-   - `POST /api/receipts/{id}/extract` -> Receipt (status `draft`, or `duplicate` with `duplicateOfId`)
-   - `GET /api/receipts/{id}` -> Receipt; `PATCH /api/receipts/{id}` body: vendor, date, currency, items, total, category -> Receipt
-   - `POST /api/receipts/{id}/confirm` -> Receipt (status `confirmed`); `.../keep-separate` -> Receipt; `.../discard-duplicate` -> null
-   - `GET /api/receipts?q&from&to&category&vendor&status=confirmed|pending` -> Receipt[]
-   - `GET /api/dashboard/summary` -> Summary; `GET /api/dashboard/categories` -> CategoryTotal[]
-   - `POST /api/questions/ask` body `{question, lang}` -> Answer (answer text in the requested `lang`, plus supporting `receipts`)
-   - Shapes are in `src/types.ts`. Totals come from the server; the browser never sums money.
+### 3. Backend Server (FastAPI)
 
-## Language
-Strings live in `src/locales/en.json` and `hi.json` (same keys). Add a category: add it to `CATEGORIES` in `src/types.ts` and add `cat.<key>` to both files.
+Set up a Python virtual environment and run the backend:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r backend/requirements.txt
+python backend/run_server.py
+```
+The backend API server runs at [http://localhost:8000](http://localhost:8000). Interactive OpenAPI documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+---
+
+## API Specifications
+
+All JSON endpoints follow a consistent envelope structure:
+- **Success**: `{"success": true, "data": { ... }, "error": null}`
+- **Error**: `{"success": false, "data": null, "error": {"code": "ERROR_CODE", "message": "User-friendly description"}}`
+
+| Endpoint | Method | Purpose |
+| :--- | :---: | :--- |
+| `/api/receipts/upload` | `POST` | Upload receipt image/PDF (returns `{ "id": string }`) |
+| `/api/receipts/{id}/extract` | `POST` | Trigger structured Gemini extraction on uploaded receipt |
+| `/api/receipts/{id}` | `GET` | Retrieve receipt details, extracted items, and flags |
+| `/api/receipts/{id}/file` | `GET` | Stream original receipt image or PDF |
+| `/api/receipts/{id}` | `PATCH` | Update receipt fields (vendor, date, total, items, category) |
+| `/api/receipts/{id}/confirm` | `POST` | Validate and confirm receipt into immutable expense ledger |
+| `/api/receipts/{id}/discard-duplicate` | `POST` | Discard flagged duplicate upload |
+| `/api/receipts/{id}/keep-separate` | `POST` | Retain flagged duplicate as a distinct purchase |
+| `/api/receipts` | `GET` | Search and filter confirmed receipts (`q`, `from`, `to`, `category`, `vendor`) |
+| `/api/dashboard/summary` | `GET` | Retrieve total spend, confirmed count, pending review count, and top vendors |
+| `/api/dashboard/categories` | `GET` | Retrieve spending aggregated by category |
+| `/api/questions/ask` | `POST` | Ask a supported question (`{ "question": string, "lang": "en" \| "hi" }`) |
+| `/api/export/csv` | `GET` | Download confirmed expense ledger as CSV |
+
+---
+
+## Build Order & Project Governance
+
+Development strictly follows an incremental 12-step approval workflow. Each step requires explicit user sign-off before proceeding:
+
+0. **Frontend Audit and Project Plan** *(Completed)*
+1. **Backend Foundation** *(FastAPI, SQLite schema, response envelope, dev proxy)*
+2. **Upload Service** *(File validation, SHA-256 hash, storage, upload UI connection)*
+3. **Gemini Extraction** *(Structured JSON prompt, Pydantic validation, error handling)*
+4. **Review & Confirmation** *(Editable form APIs, validation, explicit confirmation)*
+5. **Ledger** *(Confirmed receipts list, search/filtering, detail view)*
+6. **Duplicate Detection** *(SHA-256 exact match, similar purchase match, comparison UI)*
+7. **Dashboard** *(Backend-calculated metrics, category sums, clickable evidence)*
+8. **Question Answering** *(5 supported intents, safe dispatcher, natural phrasing)*
+9. **CSV Export** *(Backend CSV generation, formula-injection protection, download)*
+10. **Hindi UI & Accessibility** *(Bilingual verification, high-contrast, tap targets)*
+11. **Demo Readiness** *(20 synthetic receipts, full journey verification, final walkthrough)*
