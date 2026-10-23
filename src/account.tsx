@@ -9,14 +9,14 @@ const secondaryButton = 'inline-flex min-h-12 items-center justify-center rounde
 const label = 'block text-sm font-semibold text-stone-800'
 
 type AuthPageProps = {
-  configured: boolean
   error: string
   onRetry: () => void
   onAuthenticated: (account: Account) => void
 }
 
-export function AuthPage({ configured, error, onRetry, onAuthenticated }: AuthPageProps) {
+export function AuthPage({ error, onRetry, onAuthenticated }: AuthPageProps) {
   const { t, lang, setLang } = useI18n()
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState('')
   const [login, setLogin] = useState({ email: '', password: '' })
@@ -40,7 +40,7 @@ export function AuthPage({ configured, error, onRetry, onAuthenticated }: AuthPa
     setFormError('')
     setBusy(true)
     try {
-      const result = configured
+      const result = mode === 'login'
         ? await signIn(login.email, login.password)
         : await signUp(setup)
       onAuthenticated(result.account)
@@ -54,39 +54,40 @@ export function AuthPage({ configured, error, onRetry, onAuthenticated }: AuthPa
   const updateSetup = (key: keyof typeof setup, value: string) =>
     setSetup(current => ({ ...current, [key]: value }))
 
+  const switchMode = (nextMode: 'login' | 'signup') => {
+    setMode(nextMode)
+    setFormError('')
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#FAF7F2] px-4 py-8 text-stone-900">
-      <section className="w-full max-w-2xl space-y-5">
+      <section className="w-full max-w-xl space-y-5">
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 text-xl font-extrabold text-white shadow-sm">S</div>
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-800">{t('app.name')}</p>
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
-            {configured ? t('auth.loginTitle') : t('auth.setupTitle')}
+            {mode === 'login' ? t('auth.loginTitle') : t('auth.setupTitle')}
           </h1>
           <p className="mx-auto mt-2 max-w-lg text-stone-600">
-            {configured ? t('auth.loginHelp') : t('auth.setupHelp')}
+            {mode === 'login' ? t('auth.loginHelp') : t('auth.setupHelp')}
           </p>
         </div>
 
         <form className={`${panel} space-y-4`} onSubmit={submit}>
-          {!configured && (
+          {mode === 'signup' && (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className={label}>{t('auth.fullName')}
-                  <input className={input} autoComplete="name" maxLength={100} required value={setup.fullName} onChange={e => updateSetup('fullName', e.target.value)} />
-                </label>
-                <label className={label}>{t('auth.businessName')}
-                  <input className={input} autoComplete="organization" maxLength={120} required value={setup.businessName} onChange={e => updateSetup('businessName', e.target.value)} />
-                </label>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className={label}>{t('auth.phone')}
-                  <input className={input} type="tel" autoComplete="tel" maxLength={40} value={setup.phone} onChange={e => updateSetup('phone', e.target.value)} />
-                </label>
-                <label className={label}>{t('auth.gstin')}
-                  <input className={input} autoComplete="off" maxLength={20} value={setup.gstin} onChange={e => updateSetup('gstin', e.target.value)} />
-                </label>
-              </div>
+              <label className={label}>{t('auth.fullName')}
+                <input className={input} autoComplete="name" maxLength={100} required value={setup.fullName} onChange={e => updateSetup('fullName', e.target.value)} />
+              </label>
+              <label className={label}>{t('auth.businessName')}
+                <input className={input} autoComplete="organization" maxLength={120} required value={setup.businessName} onChange={e => updateSetup('businessName', e.target.value)} />
+              </label>
+              <label className={label}>{t('auth.phone')}
+                <input className={input} type="tel" autoComplete="tel" maxLength={40} value={setup.phone} onChange={e => updateSetup('phone', e.target.value)} />
+              </label>
+              <label className={label}>{t('auth.gstin')}
+                <input className={input} autoComplete="off" maxLength={20} value={setup.gstin} onChange={e => updateSetup('gstin', e.target.value)} />
+              </label>
               <label className={label}>{t('auth.address')}
                 <textarea className={`${input} min-h-20 py-3`} autoComplete="street-address" maxLength={300} value={setup.address} onChange={e => updateSetup('address', e.target.value)} />
               </label>
@@ -100,14 +101,14 @@ export function AuthPage({ configured, error, onRetry, onAuthenticated }: AuthPa
               autoComplete="email"
               maxLength={254}
               required
-              value={configured ? login.email : setup.email}
-              onChange={e => configured
+              value={mode === 'login' ? login.email : setup.email}
+              onChange={e => mode === 'login'
                 ? setLogin(current => ({ ...current, email: e.target.value }))
                 : updateSetup('email', e.target.value)}
             />
           </label>
-          {!configured && (
-            <div className="grid gap-4 sm:grid-cols-2">
+          {mode === 'signup' && (
+            <>
               <label className={label}>{t('auth.language')}
                 <select className={input} value={setup.language} onChange={e => {
                   const language=e.target.value as Lang
@@ -127,23 +128,23 @@ export function AuthPage({ configured, error, onRetry, onAuthenticated }: AuthPa
                 </select>
                 <span className="mt-1 block text-xs font-normal text-stone-500">{t('settings.currencyNote')}</span>
               </label>
-            </div>
+            </>
           )}
           <label className={label}>{t('auth.password')}
             <input
               className={input}
               type="password"
-              autoComplete={configured ? 'current-password' : 'new-password'}
-              minLength={configured ? 1 : 12}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              minLength={mode === 'login' ? 1 : 12}
               maxLength={128}
               required
-              value={configured ? login.password : setup.password}
-              onChange={e => configured
+              value={mode === 'login' ? login.password : setup.password}
+              onChange={e => mode === 'login'
                 ? setLogin(current => ({ ...current, password: e.target.value }))
                 : updateSetup('password', e.target.value)}
             />
           </label>
-          {!configured && (
+          {mode === 'signup' && (
             <>
               <p className="text-sm leading-6 text-stone-600">{t('auth.passwordHelp')}</p>
               <label className={label}>{t('auth.confirmPassword')}
@@ -173,10 +174,27 @@ export function AuthPage({ configured, error, onRetry, onAuthenticated }: AuthPa
           <button
             className={`${button} w-full`}
             type="submit"
-            disabled={busy || !!error || (!configured && !!setup.passwordConfirmation && setup.password !== setup.passwordConfirmation)}
+            disabled={busy || !!error || (mode === 'signup' && !!setup.passwordConfirmation && setup.password !== setup.passwordConfirmation)}
           >
-            {busy ? t('auth.working') : configured ? t('auth.signIn') : t('auth.createAccount')}
+            {busy ? t('auth.working') : mode === 'login' ? t('auth.signIn') : t('auth.createAccount')}
           </button>
+          <p className="text-center text-sm text-stone-600">
+            {mode === 'login' ? (
+              <>
+                {t('auth.noAccount')}{' '}
+                <button className="font-semibold text-emerald-800 underline underline-offset-2 hover:text-emerald-950" type="button" onClick={() => switchMode('signup')}>
+                  {t('auth.createAccountLink')}
+                </button>
+              </>
+            ) : (
+              <>
+                {t('auth.haveAccount')}{' '}
+                <button className="font-semibold text-emerald-800 underline underline-offset-2 hover:text-emerald-950" type="button" onClick={() => switchMode('login')}>
+                  {t('auth.signIn')}
+                </button>
+              </>
+            )}
+          </p>
           <p className="text-center text-xs leading-5 text-stone-500">{t('auth.privacy')}</p>
         </form>
         <div className="text-center">
