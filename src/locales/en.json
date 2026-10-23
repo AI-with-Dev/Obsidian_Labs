@@ -143,5 +143,12 @@
   "rv.hidePreview": "Hide preview ▲",
   "rv.autoFill": "Auto-fill total from items",
   "rv.cancelFinishLater": "Cancel and finish later",
-  "common.dismiss": "Dismiss"
+  "common.dismiss": "Dismiss",
+  "type.income": "Money Received",
+  "type.expense": "Expense",
+  "cat.retail_sales": "Retail sales",
+  "cat.wholesale_collection": "Wholesale collection",
+  "cat.advance_payment": "Advance payment",
+  "cat.credit_recovery": "Credit / Udhar recovery",
+  "cat.service_fee": "Service fee"
 }

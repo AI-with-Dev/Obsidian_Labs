@@ -143,5 +143,12 @@
   "rv.hidePreview": "रसीद छुपाएँ ▲",
   "rv.autoFill": "सामान के जोड़ से कुल रकम भरें",
   "rv.cancelFinishLater": "रद्द करें और बाद में पूरा करें",
-  "common.dismiss": "हटाएँ"
+  "common.dismiss": "हटाएँ",
+  "type.income": "प्राप्त रकम (आवक)",
+  "type.expense": "खर्च (जावक)",
+  "cat.retail_sales": "काउंटर बिक्री",
+  "cat.wholesale_collection": "थोक वसूली",
+  "cat.advance_payment": "अग्रिम भुगतान",
+  "cat.credit_recovery": "उधार वसूली",
+  "cat.service_fee": "सेवा शुल्क"
 }

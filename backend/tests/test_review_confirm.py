@@ -96,26 +96,26 @@ def test_confirm_invalid_receipt_fails(test_setup):
     assert conf_res.json()["success"] is False
 
 
-def test_export_csv_endpoint(test_setup):
-    """Test downloading confirmed expenses as CSV."""
+def test_export_pdf_endpoint(test_setup):
+    """Test downloading confirmed customer receipts as official PDF."""
     client = TestClient(app)
     fake_png = b"\x89PNG\r\n\x1a\n" + b"dummy"
     up_res = client.post("/api/receipts/upload", files={"file": ("bill.png", io.BytesIO(fake_png), "image/png")})
     receipt_id = up_res.json()["data"]["id"]
 
     client.patch(f"/api/receipts/{receipt_id}", json={
-        "vendor": "Apex Logistics",
+        "vendor": "Apex Stationery",
         "date": "2026-10-10",
         "total": 1250.0,
-        "category": "transport",
-        "items": [{"name": "Freight delivery", "amount": 1250.0}],
+        "category": "retail_sales",
+        "items": [{"name": "Registers wholesale batch", "amount": 1250.0}],
     })
     client.post(f"/api/receipts/{receipt_id}/confirm")
 
-    csv_res = client.get("/api/export/csv")
-    assert csv_res.status_code == 200
-    assert "text/csv" in csv_res.headers["content-type"]
-    text = csv_res.text
-    assert "Vendor,Date,Category,Currency,Total" in text
-    assert "Apex Logistics" in text
-    assert "1250.00" in text
+    pdf_res = client.get("/api/export/pdf")
+    assert pdf_res.status_code == 200
+    assert "application/pdf" in pdf_res.headers["content-type"]
+    assert pdf_res.content.startswith(b"%PDF-1.4")
+    assert b"ShopLedger" in pdf_res.content
+    assert b"Apex Stationery" in pdf_res.content
+
