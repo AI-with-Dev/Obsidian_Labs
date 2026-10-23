@@ -969,7 +969,11 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                   {t('home.spent')}
                 </p>
                 <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5">
+<<<<<<< HEAD
                   {money(s.totalSpent ?? s.totalReceived ?? 0, lang,currency)}
+=======
+                  {money(s.totalSpent ?? s.totalReceived ?? 0, lang, currency)}
+>>>>>>> 1b0843a10c84264319025691774290d1ceab4af9
                 </p>
               </div>
               <div className="relative z-10 pt-4 mt-2 border-t border-emerald-800/50 flex items-center justify-between text-xs text-emerald-200/80">
@@ -1525,7 +1529,11 @@ export default function App(){
             </div>
             <button
               onClick={() => setToastMessage(null)}
+<<<<<<< HEAD
               className="text-emerald-200 hover:text-white p-1"
+=======
+              className="text-emerald-200 hover:text-white p-1 cursor-pointer"
+>>>>>>> 1b0843a10c84264319025691774290d1ceab4af9
               aria-label={t('common.dismiss')}
             >
               ✕
@@ -1600,7 +1608,11 @@ export default function App(){
                       : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
                   }`}
                 >
+<<<<<<< HEAD
                   <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
+=======
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
+>>>>>>> 1b0843a10c84264319025691774290d1ceab4af9
                   <span className="truncate">{t(item.k)}</span>
                 </a>
               )
