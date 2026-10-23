@@ -11,9 +11,8 @@ This task list tracks the execution of each authorized step for **ShopLedger**. 
   - **Step 1 — Backend Foundation** [x]
   - **Step 2 — Upload Service & Storage** [x]
   - **Step 3 — Gemini Structured Extraction Service** [x]
-  - **Step 4 — Review & Confirmation Workflow** [x]
-- **Current Authorized Step**: **Step 5 — Ledger & Search Filtering (Awaiting Initiation & Approval)**
-- **Overall Progress**: 4 / 12 Steps Completed; Step 5 Next
+- **Current Authorized Step**: **Step 5 — Ledger & Search Filtering (CURRENT STEP — INITIATION & APPROVAL GATE)**
+- **Overall Progress**: 4 / 12 Steps Completed; Step 5 In Progress
 
 ---
 
@@ -92,11 +91,16 @@ This task list tracks the execution of each authorized step for **ShopLedger**. 
 
 ---
 
-### Step 5: Ledger & Search Filtering (PENDING APPROVAL)
-- [ ] Connect full `Ledger` view to live API.
-- [ ] Verify text search across vendors and line item descriptions.
-- [ ] Verify category and date-range filters.
-- [ ] Verify clicking any receipt opens its detail view.
+### Step 5: Ledger & Search Filtering (CURRENT STEP — INITIATION & APPROVAL GATE)
+- [x] Present Step 5 Scope, File Impact, API Contracts, Query Filters, and UI States.
+- [ ] Receive explicit approval ("Approved. Proceed.") before implementing code.
+- [ ] Ensure `from` query parameter is properly mapped with `Query(None, alias="from")` in `routers/receipts.py`.
+- [ ] Connect and verify full `Ledger` view to live API on localhost:5173.
+- [ ] Verify text search filtering across vendor names and line item descriptions (`q` param).
+- [ ] Verify filtering by category (`category` param) and vendor (`vendor` param).
+- [ ] Verify date-range filtering (`from` and `to` ISO date params).
+- [ ] Verify clicking any receipt in the ledger opens its detail view in `ReceiptModal` with original file preview.
+- [ ] Add automated pytest tests for ledger queries, multi-parameter filtering, text search, and sorting (`tests/test_ledger.py`).
 - [ ] Stop and present Step 5 results for review.
 
 ---
