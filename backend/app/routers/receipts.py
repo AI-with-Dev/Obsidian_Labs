@@ -77,21 +77,52 @@ async def list_all_receipts(
 from backend.app.models import ReceiptUpdatePayload
 from backend.app.services.receipt_service import (
     confirm_receipt,
+<<<<<<< HEAD
+=======
+    discard_duplicate,
+    keep_separate,
+>>>>>>> refs/remotes/origin/main
     save_receipt_draft,
 )
 
 
 @router.patch("/{id}", response_model=ApiResponse[dict])
 async def update_receipt(id: str, payload: ReceiptUpdatePayload):
+<<<<<<< HEAD
     """Save owner corrections and draft edits for a receipt."""
+=======
+    """Update receipt details and line items before confirmation."""
+>>>>>>> refs/remotes/origin/main
     data = save_receipt_draft(id, payload)
     return ApiResponse.ok(data)
 
 
 @router.post("/{id}/confirm", response_model=ApiResponse[dict])
 async def confirm_receipt_endpoint(id: str):
+<<<<<<< HEAD
     """Explicitly confirm and finalize receipt into the trusted ledger."""
+=======
+    """Confirm receipt and record into permanent expense ledger."""
+>>>>>>> refs/remotes/origin/main
     data = confirm_receipt(id)
     return ApiResponse.ok(data)
 
 
+<<<<<<< HEAD
+=======
+@router.post("/{id}/discard-duplicate", response_model=ApiResponse[None])
+async def discard_duplicate_endpoint(id: str):
+    """Discard a duplicate upload."""
+    discard_duplicate(id)
+    return ApiResponse.ok(None)
+
+
+@router.post("/{id}/keep-separate", response_model=ApiResponse[dict])
+async def keep_separate_endpoint(id: str):
+    """Keep receipt as a separate expense."""
+    data = keep_separate(id)
+    return ApiResponse.ok(data)
+
+
+
+>>>>>>> refs/remotes/origin/main

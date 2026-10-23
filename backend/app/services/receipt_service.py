@@ -353,6 +353,7 @@ def list_receipts(
         return results
 
 
+<<<<<<< HEAD
 ALLOWED_CONFIRM_CATEGORIES = {
     "inventory",
     "packaging",
@@ -369,6 +370,16 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
     with get_db() as conn:
         row = conn.execute(
             "SELECT id, status, flags_json FROM receipts WHERE id = ?;",
+=======
+from backend.app.models import ReceiptUpdatePayload
+
+
+def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
+    """Save user-edited receipt fields and line items to database before confirmation."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, vendor, receipt_date, flags_json FROM receipts WHERE id = ?;",
+>>>>>>> refs/remotes/origin/main
             (receipt_id,),
         ).fetchone()
 
@@ -378,6 +389,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 detail=f"Receipt with ID '{receipt_id}' not found.",
             )
 
+<<<<<<< HEAD
         if row["status"] == "discarded_duplicate":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -385,10 +397,16 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
             )
 
         # Money conversion to integer paise
+=======
+        current_flags = json.loads(row["flags_json"] or "[]")
+        updated_flags = [f for f in current_flags]
+
+>>>>>>> refs/remotes/origin/main
         total_paise = None
         if payload.total is not None:
             try:
                 total_paise = int(round(Decimal(str(payload.total)) * 100))
+<<<<<<< HEAD
             except Exception:
                 total_paise = None
 
@@ -421,21 +439,51 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 currency = ?,
                 total_paise = ?,
                 category = ?,
+=======
+                if "total" in updated_flags:
+                    updated_flags.remove("total")
+            except Exception:
+                total_paise = None
+
+        if payload.vendor and "vendor" in updated_flags:
+            updated_flags.remove("vendor")
+        if payload.date and "date" in updated_flags:
+            updated_flags.remove("date")
+
+        conn.execute(
+            """
+            UPDATE receipts
+            SET vendor = COALESCE(?, vendor),
+                receipt_date = COALESCE(?, receipt_date),
+                currency = COALESCE(?, currency),
+                total_paise = COALESCE(?, total_paise),
+                category = COALESCE(?, category),
+>>>>>>> refs/remotes/origin/main
                 flags_json = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?;
             """,
             (
+<<<<<<< HEAD
                 vendor,
                 date,
                 currency,
                 total_paise,
                 category,
                 json.dumps(list(existing_flags)),
+=======
+                payload.vendor,
+                payload.date,
+                payload.currency,
+                total_paise,
+                payload.category,
+                json.dumps(updated_flags),
+>>>>>>> refs/remotes/origin/main
                 receipt_id,
             ),
         )
 
+<<<<<<< HEAD
         # Replace items if items list was provided
         if payload.items is not None:
             conn.execute("DELETE FROM receipt_items WHERE receipt_id = ?;", (receipt_id,))
@@ -444,15 +492,31 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                     line_paise = int(round(Decimal(str(item.amount)) * 100))
                 except Exception:
                     line_paise = 0
+=======
+        if payload.items is not None:
+            conn.execute("DELETE FROM receipt_items WHERE receipt_id = ?;", (receipt_id,))
+            for idx, it in enumerate(payload.items):
+                try:
+                    line_paise = int(round(Decimal(str(it.amount)) * 100))
+                except Exception:
+                    line_paise = 0
+
+>>>>>>> refs/remotes/origin/main
                 conn.execute(
                     """
                     INSERT INTO receipt_items (receipt_id, item_order, description, quantity, line_total_paise)
                     VALUES (?, ?, ?, 1.0, ?);
                     """,
+<<<<<<< HEAD
                     (receipt_id, idx, item.name.strip() or "Item", line_paise),
                 )
 
         # Audit log event
+=======
+                    (receipt_id, idx, it.name or "Item", line_paise),
+                )
+
+>>>>>>> refs/remotes/origin/main
         conn.execute(
             """
             INSERT INTO receipt_events (receipt_id, event_type, details_json)
@@ -461,12 +525,20 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
             (
                 receipt_id,
                 json.dumps({
+<<<<<<< HEAD
                     "vendor": vendor,
                     "date": date,
                     "currency": currency,
                     "total": payload.total,
                     "category": category,
                     "items_count": len(payload.items) if payload.items is not None else None,
+=======
+                    "vendor": payload.vendor,
+                    "date": payload.date,
+                    "total": payload.total,
+                    "category": payload.category,
+                    "items_count": len(payload.items or []),
+>>>>>>> refs/remotes/origin/main
                 }),
             ),
         )
@@ -475,6 +547,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
 
 
 def confirm_receipt(receipt_id: str) -> dict:
+<<<<<<< HEAD
     """Validate and explicitly confirm receipt into the trusted ledger."""
     with get_db() as conn:
         row = conn.execute(
@@ -483,6 +556,12 @@ def confirm_receipt(receipt_id: str) -> dict:
             FROM receipts
             WHERE id = ?;
             """,
+=======
+    """Validate and transition receipt to confirmed status in immutable database ledger."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, vendor, receipt_date, total_paise, status FROM receipts WHERE id = ?;",
+>>>>>>> refs/remotes/origin/main
             (receipt_id,),
         ).fetchone()
 
@@ -492,6 +571,7 @@ def confirm_receipt(receipt_id: str) -> dict:
                 detail=f"Receipt with ID '{receipt_id}' not found.",
             )
 
+<<<<<<< HEAD
         if row["status"] == "discarded_duplicate":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -540,13 +620,27 @@ def confirm_receipt(receipt_id: str) -> dict:
             )
 
         # Transition to confirmed status
+=======
+        if row["total_paise"] is None or row["total_paise"] < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot confirm receipt without a valid non-negative total amount.",
+            )
+
+>>>>>>> refs/remotes/origin/main
         conn.execute(
             """
             UPDATE receipts
             SET status = 'confirmed',
+<<<<<<< HEAD
                 confirmed_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP,
                 flags_json = '[]'
+=======
+                flags_json = '[]',
+                confirmed_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+>>>>>>> refs/remotes/origin/main
             WHERE id = ?;
             """,
             (receipt_id,),
@@ -560,13 +654,50 @@ def confirm_receipt(receipt_id: str) -> dict:
             (
                 receipt_id,
                 json.dumps({
+<<<<<<< HEAD
                     "vendor": vendor,
                     "receipt_date": receipt_date,
                     "total_paise": total_paise,
                     "category": category,
+=======
+                    "vendor": row["vendor"],
+                    "total_paise": row["total_paise"],
+>>>>>>> refs/remotes/origin/main
                 }),
             ),
         )
 
     return get_receipt_details(receipt_id)
 
+<<<<<<< HEAD
+=======
+
+def discard_duplicate(receipt_id: str) -> None:
+    """Mark duplicate receipt upload as discarded."""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE receipts SET status = 'discarded_duplicate', updated_at = CURRENT_TIMESTAMP WHERE id = ?;",
+            (receipt_id,),
+        )
+        conn.execute(
+            "INSERT INTO receipt_events (receipt_id, event_type, details_json) VALUES (?, 'DISCARDED_DUPLICATE', NULL);",
+            (receipt_id,),
+        )
+
+
+def keep_separate(receipt_id: str) -> dict:
+    """Reset potential duplicate upload to needs_review as a distinct expense."""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE receipts SET duplicate_of_receipt_id = NULL, status = 'needs_review', updated_at = CURRENT_TIMESTAMP WHERE id = ?;",
+            (receipt_id,),
+        )
+        conn.execute(
+            "INSERT INTO receipt_events (receipt_id, event_type, details_json) VALUES (?, 'KEPT_SEPARATE', NULL);",
+            (receipt_id,),
+        )
+
+    return get_receipt_details(receipt_id)
+
+
+>>>>>>> refs/remotes/origin/main
