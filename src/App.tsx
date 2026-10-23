@@ -1218,12 +1218,12 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
             <div className="relative">
               <input
                 type="search"
-                className={`${field} pl-10`}
-                placeholder="Search vendor or items..."
+                className={`${field} !pl-11 pr-4 placeholder:text-stone-400`}
+                placeholder={t('lg.searchPlaceholder')}
                 value={fl.q}
                 onChange={e => up('q', e.target.value)}
               />
-              <span className="absolute left-3 top-3.5 text-stone-400">
+              <span className="absolute left-3.5 top-3.5 text-stone-400 pointer-events-none">
                 <SearchIcon className="w-5 h-5" />
               </span>
             </div>

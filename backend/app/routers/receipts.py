@@ -73,7 +73,6 @@ async def list_all_receipts(
     )
     return ApiResponse.ok(data)
 
-
 from backend.app.models import ReceiptUpdatePayload
 from backend.app.services.receipt_service import (
     confirm_receipt,
@@ -85,14 +84,14 @@ from backend.app.services.receipt_service import (
 
 @router.patch("/{id}", response_model=ApiResponse[dict])
 async def update_receipt(id: str, payload: ReceiptUpdatePayload):
-    """Update receipt details and line items before confirmation."""
+    """Save owner corrections and draft edits for a receipt."""
     data = save_receipt_draft(id, payload)
     return ApiResponse.ok(data)
 
 
 @router.post("/{id}/confirm", response_model=ApiResponse[dict])
 async def confirm_receipt_endpoint(id: str):
-    """Confirm receipt and record into permanent expense ledger."""
+    """Explicitly confirm and finalize receipt into the trusted ledger."""
     data = confirm_receipt(id)
     return ApiResponse.ok(data)
 
@@ -109,6 +108,4 @@ async def keep_separate_endpoint(id: str):
     """Keep receipt as a separate expense."""
     data = keep_separate(id)
     return ApiResponse.ok(data)
-
-
 
