@@ -1388,7 +1388,6 @@ function Ask({ onSelectReceipt }: { onSelectReceipt: (r: Receipt) => void }){
 export default function App(){
   const { t, lang, setLang, setCurrency } = useI18n()
   const [authLoading,setAuthLoading]=useState(true)
-  const [authConfigured,setAuthConfigured]=useState(false)
   const [authError,setAuthError]=useState('')
   const [account,setAccount]=useState<Account|null>(null)
   const loadAuth=useCallback(async()=>{
@@ -1396,7 +1395,6 @@ export default function App(){
     setAuthError('')
     try{
       const state=await api.authStatus()
-      setAuthConfigured(state.configured)
       setAccount(state.account)
       if(state.account){
         setLang(state.account.language)
@@ -1412,7 +1410,6 @@ export default function App(){
   useEffect(()=>{
     const expired=()=>{
       setAccount(null)
-      setAuthConfigured(true)
       setAuthError('')
     }
     window.addEventListener('shopledger:unauthorized',expired)
@@ -1470,7 +1467,6 @@ export default function App(){
 
   const handleAuthenticated = (nextAccount:Account) => {
     setAccount(nextAccount)
-    setAuthConfigured(true)
     setAuthError('')
     setLang(nextAccount.language)
     setCurrency(nextAccount.currency)
@@ -1513,7 +1509,7 @@ export default function App(){
   }
 
   if(!account){
-    return <AuthPage configured={authConfigured} error={authError} onRetry={()=>void loadAuth()} onAuthenticated={handleAuthenticated}/>
+    return <AuthPage error={authError} onRetry={()=>void loadAuth()} onAuthenticated={handleAuthenticated}/>
   }
 
   return (
