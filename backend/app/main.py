@@ -1,5 +1,11 @@
+import sys
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+repository_root = str(Path(__file__).resolve().parents[2])
+if repository_root not in sys.path:
+    sys.path.insert(0, repository_root)
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
