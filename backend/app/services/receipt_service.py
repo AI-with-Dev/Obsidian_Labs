@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -11,6 +12,8 @@ from fastapi import HTTPException, UploadFile, status
 from backend.app.config import settings
 from backend.app.database import get_db
 from backend.app.models import ReceiptUpdatePayload
+
+logger = logging.getLogger("shopledger.receipts")
 
 ALLOWED_MIMES = {
     "image/jpeg": ".jpg",
@@ -33,7 +36,14 @@ def normalize_vendor_name(vendor: Optional[str]) -> str:
     """Normalize vendor name for duplicate comparison: lowercase alphanumeric only."""
     if not vendor:
         return ""
-    return re.sub(r"[^a-z0-9]", "", vendor.lower())
+    return "".join(char for char in vendor.casefold() if char.isalnum())
+
+
+def receipt_matches_owner_business(firm_name: Optional[str], business_name: Optional[str]) -> bool:
+    """Treat a receipt as income only when its issuing firm matches the owner's business."""
+    normalized_firm = normalize_vendor_name(firm_name)
+    normalized_owner = normalize_vendor_name(business_name)
+    return bool(normalized_firm and normalized_owner and normalized_firm == normalized_owner)
 
 
 def find_similar_confirmed_duplicate(
@@ -202,13 +212,48 @@ def get_receipt_file(receipt_id: str) -> Tuple[Path, str, str]:
         return file_path, row["mime_type"], row["file_name"]
 
 
+def delete_receipt(receipt_id: str) -> None:
+    """Permanently delete a receipt and its uploaded file."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT file_path FROM receipts WHERE id = ?;",
+            (receipt_id,),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Receipt with ID '{receipt_id}' not found.",
+            )
+
+        file_path = Path(row["file_path"])
+        upload_dir = settings.upload_dir_resolved.resolve()
+        if file_path.resolve().parent != upload_dir:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Receipt file is outside the configured uploads directory.",
+            )
+
+        conn.execute("DELETE FROM receipts WHERE id = ?;", (receipt_id,))
+
+    try:
+        file_path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.exception("Receipt %s was deleted, but its uploaded file could not be removed", receipt_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Receipt was deleted, but its uploaded file could not be removed.",
+        ) from exc
+
+
 def get_receipt_details(receipt_id: str) -> dict:
     """Retrieve receipt details and line items formatted for the frontend."""
     with get_db() as conn:
         row = conn.execute(
             """
             SELECT id, file_path, file_name, vendor, receipt_date, currency,
-                   total_paise, category, status, flags_json, duplicate_of_receipt_id,
+                   total_paise, category, firm_name, customer_name, transaction_type,
+                   status, flags_json, duplicate_of_receipt_id,
                    invoice_number, tax_paise, discount_paise, payment_method, notes
             FROM receipts
             WHERE id = ?;
@@ -268,6 +313,7 @@ def get_receipt_details(receipt_id: str) -> dict:
             "items": items,
             "total": total_val,
             "category": row["category"] or "other",
+            "type": row["transaction_type"],
             "status": frontend_status,
             "fileUrl": f"/api/receipts/{row['id']}/file",
             "fileName": row["file_name"],
@@ -286,7 +332,7 @@ from decimal import Decimal
 from backend.app.services.gemini_service import extract_receipt_with_gemini
 
 
-async def perform_receipt_extraction(receipt_id: str) -> dict:
+async def perform_receipt_extraction(receipt_id: str, owner_business_name: str = "") -> dict:
     """Run structured Gemini extraction on receipt file, check duplicates, save to DB, and return Receipt shape."""
     file_path, mime_type, _ = get_receipt_file(receipt_id)
 
@@ -305,6 +351,14 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
             )
         raise
 
+    firm_name = (extraction.firm_name or "").strip()
+    is_income = receipt_matches_owner_business(firm_name, owner_business_name)
+    customer_name = (extraction.customer_name or "").strip()
+    vendor_name = customer_name if is_income else (firm_name or extraction.vendor or "").strip()
+    flags = list(extraction.uncertainty_flags)
+    if is_income and not customer_name and "vendor" not in flags:
+        flags.append("vendor")
+
     # Convert total to integer paise
     total_paise: Optional[int] = None
     if extraction.total is not None:
@@ -322,8 +376,6 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
 
         duplicate_of_id = curr["duplicate_of_receipt_id"] if curr else None
         new_status = "needs_review"
-        flags = list(extraction.uncertainty_flags)
-
         if duplicate_of_id:
             new_status = "duplicate"
             if "duplicate" not in flags:
@@ -331,7 +383,7 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
         else:
             # Check for similar duplicate against confirmed receipts
             similar = find_similar_confirmed_duplicate(
-                vendor=extraction.vendor or "",
+                vendor=vendor_name or extraction.vendor or "",
                 receipt_date=extraction.date or "",
                 total_paise=total_paise,
                 exclude_id=receipt_id,
@@ -365,6 +417,9 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
             """
             UPDATE receipts
             SET vendor = ?,
+                firm_name = ?,
+                customer_name = ?,
+                transaction_type = ?,
                 receipt_date = ?,
                 currency = ?,
                 total_paise = ?,
@@ -377,7 +432,10 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
             WHERE id = ?;
             """,
             (
-                extraction.vendor or "",
+                vendor_name,
+                firm_name,
+                customer_name,
+                "income" if is_income else "expense",
                 extraction.date or "",
                 extraction.currency or "INR",
                 total_paise,
@@ -399,6 +457,9 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
                 receipt_id,
                 json.dumps({
                     "vendor": extraction.vendor,
+                    "firm_name": firm_name,
+                    "customer_name": customer_name,
+                    "transaction_type": "income" if is_income else "expense",
                     "total": extraction.total,
                     "category": extraction.suggested_category,
                     "items_count": len(extraction.items),

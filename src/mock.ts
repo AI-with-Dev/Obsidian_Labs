@@ -100,6 +100,7 @@ export const m={
   save:(r:Receipt)=>put(r.id,r),
   confirm:(id:string)=>put(id,{status:'confirmed'}),
   discard:(id:string)=>{db=db.filter(r=>r.id!==id)},
+  deleteReceipt:(id:string)=>{db=db.filter(r=>r.id!==id)},
   keep:(id:string)=>put(id,{status:'draft',duplicateOfId:undefined}),
   list:(f:Filters)=>db.filter(r=>(f.status==='confirmed'?r.status==='confirmed':f.status==='pending'?r.status!=='confirmed':true)
     &&(!f.type||r.type===f.type)

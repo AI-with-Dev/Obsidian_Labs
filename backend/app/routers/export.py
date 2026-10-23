@@ -44,7 +44,7 @@ async def export_expenses_csv() -> Response:
             """
             SELECT vendor, receipt_date, category, currency, total_paise
             FROM receipts
-            WHERE status = 'confirmed'
+            WHERE status = 'confirmed' AND transaction_type = 'expense'
             ORDER BY receipt_date DESC, created_at DESC;
             """
         ).fetchall()

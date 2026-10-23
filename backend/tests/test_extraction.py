@@ -13,6 +13,7 @@ if str(root_dir) not in sys.path:
 from backend.app.config import settings
 from backend.app.database import get_db, init_db
 from backend.app.main import app
+from backend.app.routers.auth import require_authenticated_owner
 from backend.app.services.gemini_service import ReceiptExtractionResult, ExtractedLineItem
 
 
@@ -103,6 +104,49 @@ def test_gemini_extraction_flow(test_setup):
     assert get_res.status_code == 200
     assert get_res.json()["data"]["vendor"] == "Royal Paper Mart"
     assert get_res.json()["data"]["total"] == 2600.0
+
+
+@pytest.mark.parametrize(
+    ("firm_name", "category", "expected_type", "expected_party"),
+    [
+        ("SHARMA-STATIONERY!", "retail_sales", "income", "Asha Customer"),
+        ("Other Paper Mart", "retail_sales", "expense", "Other Paper Mart"),
+    ],
+)
+def test_extraction_direction_matches_owner_business_name(
+    test_setup, firm_name, category, expected_type, expected_party
+):
+    """Only receipts issued by the owner's firm are income, regardless of category."""
+    client = TestClient(app)
+    upload = client.post(
+        "/api/receipts/upload",
+        files={"file": ("receipt.jpg", io.BytesIO(b"\xff\xd8\xffowner-match-test"), "image/jpeg")},
+    )
+    receipt_id = upload.json()["data"]["id"]
+    extraction = ReceiptExtractionResult(
+        vendor=firm_name,
+        firm_name=firm_name,
+        customer_name="Asha Customer",
+        date="2026-10-15",
+        total=250.0,
+        suggested_category=category,
+    )
+    prior_override = app.dependency_overrides[require_authenticated_owner]
+    app.dependency_overrides[require_authenticated_owner] = lambda: {
+        "id": 1,
+        "businessName": "Sharma Stationery",
+    }
+    try:
+        with patch("backend.app.services.receipt_service.extract_receipt_with_gemini") as mock_extract:
+            mock_extract.return_value = (extraction, json.dumps(extraction.model_dump()))
+            response = client.post(f"/api/receipts/{receipt_id}/extract")
+    finally:
+        app.dependency_overrides[require_authenticated_owner] = prior_override
+
+    assert response.status_code == 200
+    receipt = response.json()["data"]
+    assert receipt["type"] == expected_type
+    assert receipt["vendor"] == expected_party
 
 
 def test_extraction_failure_handling(test_setup):

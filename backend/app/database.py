@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS receipts (
     currency TEXT NOT NULL DEFAULT 'INR',
     total_paise INTEGER,
     category TEXT,
+    firm_name TEXT,
+    customer_name TEXT,
+    transaction_type TEXT NOT NULL DEFAULT 'expense',
     status TEXT NOT NULL,
     raw_extraction_json TEXT,
     flags_json TEXT NOT NULL DEFAULT '[]',
@@ -123,6 +126,12 @@ def init_db(db_path: str = None) -> None:
             conn.execute("ALTER TABLE receipts ADD COLUMN payment_method TEXT;")
         if "notes" not in receipt_cols:
             conn.execute("ALTER TABLE receipts ADD COLUMN notes TEXT;")
+        if "firm_name" not in receipt_cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN firm_name TEXT;")
+        if "customer_name" not in receipt_cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN customer_name TEXT;")
+        if "transaction_type" not in receipt_cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN transaction_type TEXT NOT NULL DEFAULT 'expense';")
 
         item_cols = {row[1] for row in conn.execute("PRAGMA table_info(receipt_items);").fetchall()}
         if "unit_price_paise" not in item_cols:

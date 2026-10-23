@@ -262,9 +262,10 @@ interface ReviewModalProps {
   file?: File | null
   onClose: () => void
   onSuccess: (receipt: Receipt) => void
+  onDeleted: () => void
 }
 
-function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModalProps){
+function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: ReviewModalProps){
   const { t, lang } = useI18n()
 
   const [loading, setLoading] = useState(true)
@@ -288,6 +289,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [dupResolving, setDupResolving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Populate form fields from extracted/loaded receipt
   const populate = (r: Receipt) => {
@@ -414,6 +416,21 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
     }
   }
 
+  const handleDeleteReceipt = async () => {
+    if (!receipt || !receiptId || isDeleting) return
+    if (!window.confirm(t('rv.deleteConfirm'))) return
+
+    setIsDeleting(true)
+    setSubmitError(null)
+    try {
+      await api.deleteReceipt(receipt.id)
+      onDeleted()
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : t('common.error'))
+      setIsDeleting(false)
+    }
+  }
+
   // Final Validation and Save & Confirm
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -502,19 +519,37 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            className="w-9 h-9 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-900 hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer"
-            onClick={onClose}
-            disabled={isSubmitting}
-            aria-label={t('rv.close')}
-          >
-            <XIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {receiptId && receipt && (
+              <button
+                type="button"
+                className="min-h-[38px] px-3 rounded-xs border border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                onClick={() => void handleDeleteReceipt()}
+                disabled={isDeleting || isSubmitting}
+              >
+                {isDeleting ? t('rv.deleting') : t('rv.delete')}
+              </button>
+            )}
+            <button
+              type="button"
+              className="w-9 h-9 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-900 hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+              onClick={onClose}
+              disabled={isSubmitting || isDeleting}
+              aria-label={t('rv.close')}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Content */}
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
+          {submitError && (
+            <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-rose-900 text-sm font-semibold flex items-center gap-2">
+              <span>⚠</span>
+              <span>{submitError}</span>
+            </div>
+          )}
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-stone-600">
               <div className="w-10 h-10 border-3 border-emerald-700 border-t-transparent rounded-full animate-spin" />
@@ -863,13 +898,6 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
                 </div>
               </div>
 
-              {/* Inline Error Notice */}
-              {submitError && (
-                <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-rose-900 text-sm font-semibold flex items-center gap-2">
-                  <span>⚠</span>
-                  <span>{submitError}</span>
-                </div>
-              )}
             </form>
           )}
         </div>
@@ -1465,6 +1493,14 @@ export default function App(){
     }
   }
 
+  const handleModalDeleted = () => {
+    setActiveModal(null)
+    setRefreshKey(prev => prev + 1)
+    if (location.hash.startsWith('#/receipt/')) {
+      location.hash = '#/'
+    }
+  }
+
   const handleAuthenticated = (nextAccount:Account) => {
     setAccount(nextAccount)
     setAuthError('')
@@ -1552,6 +1588,7 @@ export default function App(){
           file={activeModal.file}
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
+          onDeleted={handleModalDeleted}
         />
       )}
 

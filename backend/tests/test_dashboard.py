@@ -2,7 +2,7 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
-from backend.app.database import init_db
+from backend.app.database import get_db, init_db
 
 
 @pytest.fixture(autouse=True)
@@ -104,3 +104,31 @@ def test_dashboard_aggregations_and_precision():
     assert cats[0]["amount"] == 6800.50  # 1800.50 + 5000.00
     assert cats[1]["category"] == "packaging"
     assert cats[1]["amount"] == 199.50
+
+
+def test_dashboard_separates_received_income_from_spending():
+    """Owner-firm receipts contribute to received totals, not expenses."""
+    income_id = client.post(
+        "/api/receipts/upload",
+        files={"file": ("sale.png", io.BytesIO(b"income receipt"), "image/png")},
+    ).json()["data"]["id"]
+    client.patch(
+        f"/api/receipts/{income_id}",
+        json={
+            "vendor": "Customer",
+            "date": "2026-10-20",
+            "total": 750.0,
+            "category": "retail_sales",
+        },
+    )
+    client.post(f"/api/receipts/{income_id}/confirm")
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE receipts SET transaction_type = 'income' WHERE id = ?;",
+            (income_id,),
+        )
+
+    summary = client.get("/api/dashboard/summary").json()["data"]
+    assert summary["totalSpent"] == 0.0
+    assert summary["totalReceived"] == 750.0
+    assert summary["confirmedCount"] == 1

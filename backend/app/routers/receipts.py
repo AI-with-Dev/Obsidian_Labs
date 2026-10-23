@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from backend.app.routers.auth import require_authenticated_owner
 from backend.app.models import ApiResponse
 from backend.app.services.receipt_service import (
+    delete_receipt,
     get_receipt_file,
     process_and_save_upload,
 )
@@ -41,9 +42,9 @@ from backend.app.services.receipt_service import (
 
 
 @router.post("/{id}/extract", response_model=ApiResponse[dict])
-async def extract_receipt(id: str):
+async def extract_receipt(id: str, owner: dict = Depends(require_authenticated_owner)):
     """Extract structured data from receipt using Gemini API."""
-    data = await perform_receipt_extraction(id)
+    data = await perform_receipt_extraction(id, owner.get("businessName", ""))
     return ApiResponse.ok(data)
 
 
@@ -52,6 +53,13 @@ async def get_receipt(id: str):
     """Retrieve receipt details and line items."""
     data = get_receipt_details(id)
     return ApiResponse.ok(data)
+
+
+@router.delete("/{id}", response_model=ApiResponse[None])
+async def delete_receipt_endpoint(id: str):
+    """Permanently delete a receipt and its uploaded file."""
+    delete_receipt(id)
+    return ApiResponse.ok(None)
 
 
 from typing import Optional

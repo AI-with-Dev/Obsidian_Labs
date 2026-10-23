@@ -158,14 +158,14 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 """
                 SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed';
+                WHERE status = 'confirmed' AND transaction_type = 'expense';
                 """
             ).fetchone()
             tot = (row["total_paise"] or 0) / 100.0
             cnt = row["count"] or 0
 
             rows = conn.execute(
-                "SELECT id FROM receipts WHERE status = 'confirmed' ORDER BY receipt_date DESC LIMIT 10;"
+                "SELECT id FROM receipts WHERE status = 'confirmed' AND transaction_type = 'expense' ORDER BY receipt_date DESC LIMIT 10;"
             ).fetchall()
             receipt_ids = [r["id"] for r in rows]
 
@@ -182,7 +182,8 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 """
                 SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed' AND LOWER(TRIM(category)) = ?;
+                WHERE status = 'confirmed' AND transaction_type = 'expense'
+                  AND LOWER(TRIM(category)) = ?;
                 """,
                 (cat,),
             ).fetchone()
@@ -192,7 +193,8 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
             rows = conn.execute(
                 """
                 SELECT id FROM receipts
-                WHERE status = 'confirmed' AND LOWER(TRIM(category)) = ?
+                WHERE status = 'confirmed' AND transaction_type = 'expense'
+                  AND LOWER(TRIM(category)) = ?
                 ORDER BY receipt_date DESC LIMIT 10;
                 """,
                 (cat,),
@@ -209,7 +211,7 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 """
                 SELECT TRIM(vendor) AS vendor_name, COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed' AND TRIM(vendor) != ''
+                WHERE status = 'confirmed' AND transaction_type = 'expense' AND TRIM(vendor) != ''
                 GROUP BY TRIM(vendor)
                 ORDER BY total_paise DESC
                 LIMIT 1;
@@ -224,7 +226,7 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 rows = conn.execute(
                     """
                     SELECT id FROM receipts
-                    WHERE status = 'confirmed' AND TRIM(vendor) = ?
+                    WHERE status = 'confirmed' AND transaction_type = 'expense' AND TRIM(vendor) = ?
                     ORDER BY receipt_date DESC LIMIT 10;
                     """,
                     (v_name,),
@@ -249,7 +251,8 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 """
                 SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed' AND receipt_date >= ? AND receipt_date <= ?;
+                WHERE status = 'confirmed' AND transaction_type = 'expense'
+                  AND receipt_date >= ? AND receipt_date <= ?;
                 """,
                 (start_date, end_date),
             ).fetchone()
@@ -259,7 +262,8 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
             rows = conn.execute(
                 """
                 SELECT id FROM receipts
-                WHERE status = 'confirmed' AND receipt_date >= ? AND receipt_date <= ?
+                WHERE status = 'confirmed' AND transaction_type = 'expense'
+                  AND receipt_date >= ? AND receipt_date <= ?
                 ORDER BY receipt_date DESC LIMIT 10;
                 """,
                 (start_date, end_date),
