@@ -116,6 +116,6 @@ def test_export_pdf_endpoint(test_setup):
     assert pdf_res.status_code == 200
     assert "application/pdf" in pdf_res.headers["content-type"]
     assert pdf_res.content.startswith(b"%PDF-1.4")
-    assert b"ShopLedger" in pdf_res.content
+    assert b"Vyapar Mitra" in pdf_res.content
     assert b"Apex Stationery" in pdf_res.content
 

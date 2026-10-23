@@ -48,7 +48,7 @@ function generatePdfDoc(): string {
   const totExp = sum(confExpense())
   const items = conf().slice(0, 30)
 
-  let stream = 'BT /F1 16 Tf 50 780 Td (ShopLedger - Official Payment & Collections Summary) Tj\n'
+  let stream = 'BT /F1 16 Tf 50 780 Td (Vyapar Mitra - Official Payment & Collections Summary) Tj\n'
   stream += '/F2 10 Tf 0 -22 Td (Export Format: Official PDF | Generated: ' + new Date().toISOString().slice(0, 10) + ') Tj\n'
   stream += '/F1 12 Tf 0 -24 Td (TOTAL MONEY RECEIVED: (+) INR ' + totInc.toLocaleString('en-IN') + ') Tj\n'
   if (totExp > 0) {

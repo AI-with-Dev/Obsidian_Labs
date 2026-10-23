@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Account, changePassword, exportCsv, exportPdf, saveProfile, signIn, signUp } from './api'
 import { Lang, useI18n } from './i18n'
+import { VyaparMitraLogo } from './components/VyaparMitraLogo'
 
 const panel = 'rounded-2xl border border-stone-200 bg-white p-5 shadow-xs sm:p-7'
 const input = 'mt-1.5 min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3.5 text-base text-stone-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600'
@@ -63,7 +64,9 @@ export function AuthPage({ error, onRetry, onAuthenticated }: AuthPageProps) {
     <main className="flex min-h-screen items-center justify-center bg-[#FAF7F2] px-4 py-8 text-stone-900">
       <section className="w-full max-w-xl space-y-5">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 text-xl font-extrabold text-white shadow-sm">S</div>
+          <div className="mx-auto mb-4 flex justify-center">
+            <VyaparMitraLogo className="w-16 h-16 drop-shadow-md hover:scale-105 transition-transform" />
+          </div>
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-800">{t('app.name')}</p>
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
             {mode === 'login' ? t('auth.loginTitle') : t('auth.setupTitle')}

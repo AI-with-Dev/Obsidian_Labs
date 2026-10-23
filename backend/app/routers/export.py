@@ -75,7 +75,7 @@ async def export_expenses_csv() -> Response:
         content=csv_text,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": 'attachment; filename="shopledger-expenses.csv"',
+            "Content-Disposition": 'attachment; filename="vyapar-mitra-expenses.csv"',
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",

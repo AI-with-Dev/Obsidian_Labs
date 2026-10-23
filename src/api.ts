@@ -13,7 +13,7 @@ async function call<T>(path:string,init:RequestInit|undefined,mock:()=>T):Promis
   const body=init?.body
   const res=await fetch((BASE||'')+path,{...init,credentials:'include',headers:body instanceof FormData?{}:{'Content-Type':'application/json'}})
   if(res.status===401&&path!=='/api/auth/status'&&path!=='/api/auth/login'){
-    window.dispatchEvent(new Event('shopledger:unauthorized'))
+    window.dispatchEvent(new Event('vyapar-mitra:unauthorized'))
   }
   const j=await res.json().catch(()=>null)
   if(!res.ok||!j?.success)throw new Error(j?.error?.message??j?.error??'Request failed')
@@ -75,7 +75,7 @@ export async function exportPdf(){
   let blob:Blob
   if(!MOCK){
     const r=await fetch((BASE||'')+'/api/export/pdf',{credentials:'include'})
-    if(r.status===401)window.dispatchEvent(new Event('shopledger:unauthorized'))
+    if(r.status===401)window.dispatchEvent(new Event('vyapar-mitra:unauthorized'))
     if(!r.ok) throw new Error('PDF export failed')
     blob=await r.blob()
   } else {
@@ -84,7 +84,7 @@ export async function exportPdf(){
   }
   const a=document.createElement('a')
   a.href=URL.createObjectURL(blob)
-  a.download='shopledger-payment-summary.pdf'
+  a.download='vyapar-mitra-payment-summary.pdf'
   a.click()
   window.setTimeout(()=>URL.revokeObjectURL(a.href),1000)
 }
@@ -92,13 +92,13 @@ export async function exportPdf(){
 export async function exportCsv(){
   if(MOCK)throw new Error('CSV export requires the backend API.')
   const response=await fetch((BASE||'')+'/api/export/csv',{credentials:'include'})
-  if(response.status===401)window.dispatchEvent(new Event('shopledger:unauthorized'))
+  if(response.status===401)window.dispatchEvent(new Event('vyapar-mitra:unauthorized'))
   if(!response.ok)throw new Error('CSV export failed')
   const blob=await response.blob()
   const url=URL.createObjectURL(blob)
   const link=document.createElement('a')
   link.href=url
-  link.download='shopledger-ledger.csv'
+  link.download='vyapar-mitra-ledger.csv'
   link.click()
   window.setTimeout(()=>URL.revokeObjectURL(url),1000)
 }

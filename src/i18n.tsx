@@ -14,7 +14,7 @@ export function I18n({children}:{children:ReactNode}){
   const setLang=(l:Lang)=>{localStorage.setItem('lang',l);set(l)}
   const updateCurrency=(c:string)=>{localStorage.setItem('currency',c);setCurrency(c)}
   document.documentElement.lang=lang
-  document.title = lang === 'hi' ? 'शॉपलेज़र (ShopLedger)' : 'ShopLedger'
+  document.title = lang === 'hi' ? 'व्यापार मित्र (Vyapar Mitra)' : 'Vyapar Mitra'
   const t=(k:string,v:V={})=>(dict[lang][k]??k).replace(/\{(\w+)\}/g,(_,x)=>String(v[x]??''))
   return <Ctx.Provider value={{lang,setLang,currency,setCurrency:updateCurrency,t}}>{children}</Ctx.Provider>
 }

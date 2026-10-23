@@ -28,16 +28,16 @@ logger = logging.getLogger("shopledger.backend")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle event handler for FastAPI."""
-    logger.info("Initializing ShopLedger database and storage...")
+    logger.info("Initializing Vyapar Mitra database and storage...")
     init_db()
     settings.upload_dir_resolved.mkdir(parents=True, exist_ok=True)
     logger.info("Backend initialization complete.")
     yield
-    logger.info("ShopLedger backend shutting down.")
+    logger.info("Vyapar Mitra backend shutting down.")
 
 
 app = FastAPI(
-    title="ShopLedger API",
+    title="Vyapar Mitra API",
     description="Expense management and receipt extraction backend for Indian small shops.",
     version="0.1.0",
     lifespan=lifespan,
@@ -151,7 +151,7 @@ async def export_payments_pdf():
             r["total_paise"] or 0 for r in rows if r["transaction_type"] == "expense"
         ) / 100.0
 
-        stream = "BT /F1 16 Tf 50 780 Td (ShopLedger - Official Payment & Collections Summary) Tj\n"
+        stream = "BT /F1 16 Tf 50 780 Td (Vyapar Mitra - Official Payment & Collections Summary) Tj\n"
         stream += f"/F2 10 Tf 0 -22 Td (Export Format: Official PDF | Total Records: {len(rows)}) Tj\n"
         stream += f"/F1 12 Tf 0 -24 Td (TOTAL MONEY RECEIVED: (+) INR {total_received:,.2f}) Tj\n"
         stream += f"/F1 10 Tf 0 -18 Td (TOTAL MONEY GIVEN: (-) INR {total_spent:,.2f}) Tj\n"
@@ -197,5 +197,5 @@ async def export_payments_pdf():
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": "attachment; filename=shopledger-payment-summary.pdf"},
+            headers={"Content-Disposition": "attachment; filename=vyapar-mitra-payment-summary.pdf"},
         )
