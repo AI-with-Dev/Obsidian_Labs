@@ -112,7 +112,7 @@ To host the FastAPI API on Streamlit Community Cloud, set **Main file path** to 
 
 On first launch, create the shop's single owner account with your name, email, business details, preferred language, display currency, and a password. Passwords must be at least 12 characters and include uppercase and lowercase letters, a number, and a symbol; signup also asks you to confirm the password. The backend stores only a salted PBKDF2 password hash and issues an HTTP-only session cookie. Email/OTP verification is not enabled because this project has no email delivery service configured.
 
-After setup, use the email and password to sign in. The **Settings** page lets you edit your profile, language and display currency, change your password, export CSV/PDF reports, or sign out. Changing your password revokes other sessions. Currency selection changes display formatting only; it does not perform exchange-rate conversion.
+After setup, use the email and password to sign in. The **Settings** page lets you edit your profile, language and display currency, change your password, export CSV/PDF reports, or sign out. Changing your password revokes other sessions. Currency selection changes display formatting only; it does not perform exchange-rate conversion. When the frontend and API are hosted on separate HTTPS origins, the HTTP-only session cookie uses `SameSite=None; Secure` so the browser can send it with credentialed API requests.
 
 ---
 

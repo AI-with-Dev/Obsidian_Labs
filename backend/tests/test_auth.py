@@ -65,7 +65,7 @@ def test_first_run_setup_and_login_protection(client):
     assert account["currency"] == "INR"
     session_cookie = next(cookie for cookie in client.cookies.jar if cookie.name == "shopledger_session")
     assert "HttpOnly" in session_cookie._rest
-    assert session_cookie._rest.get("SameSite") == "strict"
+    assert session_cookie._rest.get("SameSite") == "lax"
     assert client.get("/api/dashboard/summary").status_code == 200
 
     setup_again = client.post("/api/auth/setup", json=ACCOUNT)
@@ -79,6 +79,22 @@ def test_first_run_setup_and_login_protection(client):
     )
     assert logged_in.status_code == 200
     assert logged_in.json()["data"]["account"]["email"] == ACCOUNT["email"]
+
+
+def test_https_cross_origin_session_cookie(client):
+    https_client = TestClient(app, base_url="https://api.example.com")
+    response = https_client.post(
+        "/api/auth/setup",
+        json=ACCOUNT,
+        headers={"Origin": "https://app.example.com"},
+    )
+
+    assert response.status_code == 201
+    cookie = response.headers["set-cookie"].lower()
+    assert "samesite=none" in cookie
+    assert "secure" in cookie
+    assert "httponly" in cookie
+    assert https_client.get("/api/auth/status").json()["data"]["authenticated"] is True
 
 
 @pytest.mark.parametrize(

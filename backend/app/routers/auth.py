@@ -20,6 +20,17 @@ PASSWORD_ITERATIONS = 310_000
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+def _cookie_security(request: Request) -> tuple[bool, str]:
+    origin = request.headers.get("origin", "")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+    secure = (
+        request.url.scheme == "https"
+        or forwarded_proto == "https"
+        or origin.startswith("https://")
+    )
+    return secure, "none" if secure else "lax"
+
+
 class AccountInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -117,6 +128,7 @@ def _new_session(owner_id: int, response: Response, request: Request) -> None:
     token = secrets.token_urlsafe(32)
     expires_at = int(time.time()) + SESSION_TTL_SECONDS
     token_hash = hashlib.sha256(token.encode()).hexdigest()
+    secure, samesite = _cookie_security(request)
     with get_db() as conn:
         conn.execute(
             "INSERT INTO login_sessions(token_hash, owner_id, expires_at) VALUES (?, ?, ?)",
@@ -127,8 +139,8 @@ def _new_session(owner_id: int, response: Response, request: Request) -> None:
         token,
         max_age=SESSION_TTL_SECONDS,
         httponly=True,
-        secure=request.url.scheme == "https",
-        samesite="strict",
+        secure=secure,
+        samesite=samesite,
         path="/api",
     )
 
@@ -241,7 +253,14 @@ async def logout(request: Request, response: Response):
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         with get_db() as conn:
             conn.execute("DELETE FROM login_sessions WHERE token_hash = ?", (token_hash,))
-    response.delete_cookie(SESSION_COOKIE, path="/api", httponly=True, samesite="strict")
+    secure, samesite = _cookie_security(request)
+    response.delete_cookie(
+        SESSION_COOKIE,
+        path="/api",
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+    )
     return ApiResponse.ok({"signedOut": True})
 
 
