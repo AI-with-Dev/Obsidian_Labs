@@ -48,4 +48,13 @@ class ReceiptUpdatePayload(BaseModel):
     discount: Optional[float] = None
     paymentMethod: Optional[str] = None
     notes: Optional[str] = None
+    data: Optional[str] = None
+
+
+class VoiceQuickEntryPayload(BaseModel):
+    spoken_text: str
+    amount: float
+    vendor: Optional[str] = "Quick Expense"
+    category: Optional[str] = "other"
+    data: Optional[str] = None
 

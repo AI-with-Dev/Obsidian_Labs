@@ -42,7 +42,7 @@ async def get_dashboard_summary(owner: dict = Depends(require_authenticated_owne
             """
             SELECT COUNT(*) AS review_count
             FROM receipts
-            WHERE owner_id = ? AND status != 'confirmed' AND status != 'discarded_duplicate';
+            WHERE owner_id = ? AND status NOT IN ('confirmed', 'discarded_duplicate', 'extraction_failed');
             """,
             (owner["id"],),
         ).fetchone()

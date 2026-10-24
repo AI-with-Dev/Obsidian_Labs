@@ -19,7 +19,7 @@ OWNER_COLUMNS = (
 RECEIPT_COLUMNS = (
     "id, owner_id, file_path, file_name, file_hash, mime_type, vendor, receipt_date, "
     "currency, total_paise, category, firm_name, customer_name, transaction_type, status, "
-    "raw_extraction_json, flags_json, duplicate_of_receipt_id, created_at, updated_at, "
+    "raw_extraction_json, flags_json, data, type, duplicate_of_receipt_id, created_at, updated_at, "
     "confirmed_at, invoice_number, tax_paise, discount_paise, payment_method, notes"
 )
 ITEM_COLUMNS = (

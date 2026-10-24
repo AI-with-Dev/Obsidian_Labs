@@ -58,7 +58,7 @@ export function VyaparMitraLogo({
 
       {/* Outer rounded squircle badge */}
       <rect x="2" y="2" width="40" height="40" rx="11" fill={`url(#${gradId})`} />
-      
+
       {/* Subtle glass rim highlight */}
       <rect
         x="2.5"

@@ -28,6 +28,7 @@ export interface Receipt {
   discount?: number
   paymentMethod?: string
   notes?: string
+  data?: string
 }
 
 export interface Summary {

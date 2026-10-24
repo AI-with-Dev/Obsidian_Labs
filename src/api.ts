@@ -67,11 +67,15 @@ export const save=async(r:Receipt)=>apiFileUrl(await call<Receipt>(`/api/receipt
   discount:r.discount,
   paymentMethod:r.paymentMethod,
   notes:r.notes,
+  data:r.data,
 }),()=>m.save(r)))
 export const confirm=async(id:string)=>apiFileUrl(await call<Receipt>(`/api/receipts/${id}/confirm`,json('POST'),()=>m.confirm(id)))
 export const discard=(id:string)=>call<void>(`/api/receipts/${id}/discard-duplicate`,json('POST'),()=>m.discard(id))
 export const deleteReceipt=(id:string)=>call<void>(`/api/receipts/${id}`,json('DELETE'),()=>m.deleteReceipt(id))
 export const keepSeparate=async(id:string)=>apiFileUrl(await call<Receipt>(`/api/receipts/${id}/keep-separate`,json('POST'),()=>m.keep(id)))
+export const voiceQuickEntry=(payload:{spoken_text:string;amount:number;vendor?:string;category?:string;data?:string})=>
+  call<Receipt>('/api/receipts/voice-quick-entry',json('POST',payload),()=>m.voiceQuickEntry(payload))
+    .then(apiFileUrl)
 export const list=async(f:Filters={})=>(await call<Receipt[]>('/api/receipts?'+new URLSearchParams(Object.entries(f).filter(([,v])=>v) as [string,string][]),undefined,()=>m.list(f))).map(apiFileUrl)
 export const summary=()=>call<Summary>('/api/dashboard/summary',undefined,()=>m.summary())
 export const categories=()=>call<CategoryTotal[]>('/api/dashboard/categories',undefined,()=>m.categories())

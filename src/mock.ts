@@ -94,14 +94,20 @@ function generatePdfDoc(): string {
 }
 
 export const m={
-  upload:(f:File)=>{const r=mk('r'+(db.length+1),'','','other',0,'draft',[],'income',{fileName:f.name,fileUrl:URL.createObjectURL(f)});r.total=null;db=[r,...db];return {id:r.id}},
-  extract:(id:string)=>put(id,{vendor:'Shri Krishna Books (Counter)',date:'',total:780,category:'retail_sales',type:'income',items:[{name:'Registers & Notebooks',amount:520},{name:'Gel pens box',amount:260}],flags:['date']}),
+  upload:(f:File)=>{const r=mk('r'+(db.length+1),'','','other',0,'draft',[],'expense',{fileName:f.name,fileUrl:URL.createObjectURL(f)});r.total=null;db=[r,...db];return {id:r.id}},
+  extract:(id:string)=>put(id,{vendor:'Shri Krishna Books (Counter)',date:'',total:780,category:'inventory',type:'expense',items:[{name:'Registers & Notebooks',amount:520},{name:'Gel pens box',amount:260}],flags:['date']}),
   get:(id:string)=>({...find(id)}),
   save:(r:Receipt)=>put(r.id,r),
   confirm:(id:string)=>put(id,{status:'confirmed'}),
   discard:(id:string)=>{db=db.filter(r=>r.id!==id)},
   deleteReceipt:(id:string)=>{db=db.filter(r=>r.id!==id)},
   keep:(id:string)=>put(id,{status:'draft',duplicateOfId:undefined}),
+  voiceQuickEntry:(p:{spoken_text:string;amount:number;vendor?:string;category?:string;data?:string})=>{
+    const id='r'+(db.length+1)
+    const r=mk(id,p.vendor||'Voice Added Money',new Date().toISOString().slice(0,10),p.category||'other',p.amount,'confirmed',[{name:p.spoken_text,amount:p.amount}],'income',{data:p.data||p.spoken_text})
+    db=[r,...db]
+    return r
+  },
   list:(f:Filters)=>db.filter(r=>(f.status==='confirmed'?r.status==='confirmed':f.status==='pending'?r.status!=='confirmed':true)
     &&(!f.type||r.type===f.type)
     &&(!f.q||(r.vendor+r.items.map(i=>i.name).join(' ')).toLowerCase().includes(f.q.toLowerCase()))
