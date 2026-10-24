@@ -5,9 +5,6 @@ from backend.app.database import init_db
 from conftest import ensure_test_owner
 
 
-from conftest import ensure_test_owner
-
-
 @pytest.fixture(autouse=True)
 def setup_db(tmp_path, monkeypatch):
     """Use an isolated database and upload directory for each test."""
@@ -60,13 +57,9 @@ def test_voice_quick_entry_success_under_1000():
 
     # Verify dashboard reflects confirmed receipt under totalReceived
     summary = client.get("/api/dashboard/summary").json()["data"]
-<<<<<<< HEAD
-    assert summary["totalReceived"] == 60.0
-=======
     assert summary["totalSpent"] == 0.0
     assert summary["totalReceived"] == 60.0
     assert summary["totalBalance"] == 60.0
->>>>>>> refs/remotes/origin/main
     assert summary["confirmedCount"] == 1
     assert summary["reviewCount"] == 0
 

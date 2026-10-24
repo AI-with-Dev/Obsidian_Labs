@@ -947,14 +947,8 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
 
     # Generate an SVG voucher file for receipt retrieval.
     voucher_filename = f"{receipt_id}_voice_voucher.svg"
-<<<<<<< HEAD
-    voucher_path = settings.upload_dir_resolved / voucher_filename
-
     if is_income:
         svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
-=======
-    svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
->>>>>>> refs/remotes/origin/main
   <rect width="400" height="400" fill="#FFFDF8" stroke="#059669" stroke-width="3" rx="12"/>
   <rect x="0" y="0" width="400" height="60" fill="#064E3B"/>
   <text x="200" y="38" font-size="18" font-family="sans-serif" font-weight="bold" fill="#ECFDF5" text-anchor="middle">VOICE MONEY ADDED VOUCHER</text>
@@ -967,24 +961,21 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
   <text x="30" y="300" font-size="16" font-family="sans-serif" fill="#6B7280">Total Added (जमा):</text>
   <text x="30" y="340" font-size="32" font-family="sans-serif" font-weight="extrabold" fill="#059669">+ INR {payload.amount:.2f}</text>
 </svg>"""
-<<<<<<< HEAD
     else:
         svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
   <rect width="400" height="400" fill="#FFFDF8" stroke="#D97706" stroke-width="3" rx="12"/>
   <rect x="0" y="0" width="400" height="60" fill="#78350F"/>
   <text x="200" y="38" font-size="18" font-family="sans-serif" font-weight="bold" fill="#FEF3C7" text-anchor="middle">VOICE CREDIT / UDHAR VOUCHER</text>
   <text x="30" y="110" font-size="16" font-family="sans-serif" fill="#6B7280">Receiver / Party:</text>
-  <text x="30" y="135" font-size="20" font-family="sans-serif" font-weight="bold" fill="#111827">{vendor_name}</text>
+  <text x="30" y="135" font-size="20" font-family="sans-serif" font-weight="bold" fill="#111827">{safe_vendor_name}</text>
   <text x="30" y="180" font-size="16" font-family="sans-serif" fill="#6B7280">Date: {today_str}</text>
   <text x="30" y="210" font-size="16" font-family="sans-serif" fill="#6B7280">Voice Audio Data:</text>
-  <text x="30" y="235" font-size="14" font-family="sans-serif" fill="#92400E" font-style="italic">{payload.spoken_text[:40]}</text>
+  <text x="30" y="235" font-size="14" font-family="sans-serif" fill="#92400E" font-style="italic">{safe_spoken_text}</text>
   <line x1="30" y1="260" x2="370" y2="260" stroke="#E5E7EB" stroke-width="2"/>
   <text x="30" y="300" font-size="16" font-family="sans-serif" fill="#6B7280">Total Credited / Udhar (उधार):</text>
   <text x="30" y="340" font-size="32" font-family="sans-serif" font-weight="extrabold" fill="#B45309">- INR {payload.amount:.2f}</text>
 </svg>"""
 
-    voucher_path.write_text(svg_content, encoding="utf-8")
-=======
     if settings.uses_supabase_storage:
         stored_path = f"{owner_id}/{voucher_filename}"
         upload_object(stored_path, svg_content.encode("utf-8"), "image/svg+xml")
@@ -992,7 +983,6 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
         voucher_path = settings.upload_dir_resolved / voucher_filename
         voucher_path.write_text(svg_content, encoding="utf-8")
         stored_path = str(voucher_path)
->>>>>>> refs/remotes/origin/main
     file_hash = hashlib.sha256(svg_content.encode("utf-8")).hexdigest()
 
     with get_db() as conn:
@@ -1049,4 +1039,3 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
         )
 
     return get_receipt_details(receipt_id, owner_id)
-
