@@ -25,6 +25,31 @@ def test_storage_url_handles_supabase_rest_api_url(monkeypatch):
     )
 
 
+def test_storage_url_trims_copied_whitespace(monkeypatch):
+    monkeypatch.setattr(
+        settings,
+        "SUPABASE_URL",
+        "  https://project.supabase.co\n",
+    )
+
+    assert _url("bucket/receipt-files") == (
+        "https://project.supabase.co/storage/v1/bucket/receipt-files"
+    )
+
+
+def test_storage_configuration_rejects_internal_url_newlines(monkeypatch):
+    monkeypatch.setattr(settings, "DATABASE_URL", "")
+    monkeypatch.setattr(
+        settings,
+        "SUPABASE_URL",
+        "https://project.supabase.co\n/rest/v1",
+    )
+    monkeypatch.setattr(settings, "SUPABASE_SERVICE_ROLE_KEY", "server-only-test-key")
+
+    with pytest.raises(RuntimeError, match="no whitespace or extra path"):
+        validate_storage_configuration()
+
+
 def test_postgres_placeholder_conversion_preserves_quoted_question_marks():
     query = "SELECT '?' AS literal, col FROM table WHERE a = ? AND b = \"?\""
     assert PostgresConnection._postgres_placeholders(query) == (
@@ -84,3 +109,25 @@ def test_supabase_storage_bucket_and_object_operations(monkeypatch):
         call.headers["authorization"] == "Bearer server-only-test-key"
         for call in calls
     )
+
+
+def test_bucket_setup_error_includes_supabase_response(monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://project.supabase.co")
+    monkeypatch.setattr(settings, "SUPABASE_SERVICE_ROLE_KEY", "server-only-test-key")
+    monkeypatch.setattr(settings, "SUPABASE_STORAGE_BUCKET", "receipt-files")
+
+    responses = iter(
+        [
+            httpx.Response(404, json={"message": "Bucket not found"}),
+            httpx.Response(401, json={"message": "Invalid API key"}),
+        ]
+    )
+    transport = httpx.MockTransport(lambda request: next(responses))
+    client_type = httpx.Client
+    monkeypatch.setattr(
+        "backend.app.storage.httpx.Client",
+        lambda **kwargs: client_type(transport=transport, **kwargs),
+    )
+
+    with pytest.raises(RuntimeError, match=r"HTTP 401.*Invalid API key"):
+        ensure_storage_bucket()

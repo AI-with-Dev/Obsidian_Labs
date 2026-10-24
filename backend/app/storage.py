@@ -1,5 +1,5 @@
 import logging
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 from fastapi import HTTPException, status
@@ -7,6 +7,27 @@ from fastapi import HTTPException, status
 from backend.app.config import settings
 
 logger = logging.getLogger("shopledger.storage")
+
+
+def _project_url() -> str:
+    project_url = settings.SUPABASE_URL.strip().rstrip("/")
+    if project_url.endswith("/rest/v1"):
+        project_url = project_url.removesuffix("/rest/v1")
+
+    parsed = urlsplit(project_url)
+    if (
+        any(char.isspace() for char in project_url)
+        or parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError(
+            "SUPABASE_URL must be the HTTPS project URL only, for example "
+            "'https://your-project.supabase.co', with no whitespace or extra path."
+        )
+    return project_url
 
 
 def validate_storage_configuration() -> None:
@@ -20,6 +41,8 @@ def validate_storage_configuration() -> None:
         raise RuntimeError(
             "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required when DATABASE_URL is set."
         )
+    if has_url:
+        _project_url()
 
 
 def _headers(content_type: str | None = None) -> dict[str, str]:
@@ -33,10 +56,7 @@ def _headers(content_type: str | None = None) -> dict[str, str]:
 
 
 def _url(path: str) -> str:
-    project_url = settings.SUPABASE_URL.rstrip("/")
-    if project_url.endswith("/rest/v1"):
-        project_url = project_url.removesuffix("/rest/v1")
-    return f"{project_url}/storage/v1/{path}"
+    return f"{_project_url()}/storage/v1/{path}"
 
 
 def _request(method: str, path: str, **kwargs) -> httpx.Response:
@@ -87,8 +107,16 @@ def ensure_storage_bucket() -> None:
         logger.exception("Could not initialize Supabase Storage bucket")
         raise RuntimeError("Supabase Storage is unreachable during startup.") from exc
     if response.is_error:
-        logger.error("Supabase Storage bucket setup returned HTTP %s", response.status_code)
-        raise RuntimeError("Could not create or verify the Supabase Storage bucket.")
+        response_detail = response.text[:500]
+        logger.error(
+            "Supabase Storage bucket setup returned HTTP %s: %s",
+            response.status_code,
+            response_detail,
+        )
+        raise RuntimeError(
+            "Could not create or verify the Supabase Storage bucket "
+            f"(HTTP {response.status_code}): {response_detail}"
+        )
     if response.json().get("public", False):
         raise RuntimeError(
             f"Supabase Storage bucket '{settings.SUPABASE_STORAGE_BUCKET}' must be private."
