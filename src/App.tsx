@@ -4,7 +4,7 @@ import * as api from './api'
 import {Account} from './api'
 import {AuthPage,SettingsPage} from './account'
 import {VyaparMitraLogo} from './components/VyaparMitraLogo'
-import {CATEGORIES,Receipt,Item,Filters,Answer} from './types'
+import {Receipt,Item,Filters,Answer} from './types'
 
 // Reusable SVG Icons for clear, simple visual guidance
 function StoreIcon({className="w-5 h-5"}:{className?:string}){
@@ -62,17 +62,6 @@ const field = 'w-full min-h-[48px] sm:min-h-[50px] px-3.5 sm:px-4 rounded-xl bor
 const card = 'block rounded-2xl bg-white border-2 border-stone-200/90 shadow-2xs hover:shadow-xs transition-all p-5 sm:p-6'
 const h1 = 'text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 mb-1'
 const h2 = 'text-xl sm:text-2xl font-bold tracking-tight text-stone-900 mb-4'
-
-// Subtle category pill colors for easy recognition
-const catColors: Record<string, string> = {
-  inventory: 'bg-emerald-50 text-emerald-800 border-emerald-200/70',
-  packaging: 'bg-amber-50 text-amber-800 border-amber-200/70',
-  transport: 'bg-blue-50 text-blue-800 border-blue-200/70',
-  utilities: 'bg-teal-50 text-teal-800 border-teal-200/70',
-  rent: 'bg-purple-50 text-purple-800 border-purple-200/70',
-  repairs: 'bg-rose-50 text-rose-800 border-rose-200/70',
-  other: 'bg-stone-100 text-stone-700 border-stone-200/70',
-}
 
 const OK = ['image/jpeg', 'image/png', 'application/pdf']
 
@@ -172,10 +161,6 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
                 </b>
                 <div className="flex items-center flex-wrap gap-2 text-sm text-stone-500 mt-0.5">
                   <span>{r.date ? day(r.date, lang) : '—'}</span>
-                  <span>•</span>
-                  <span className={`px-2 py-0.5 rounded-xs text-xs font-medium border ${catColors[r.category] || catColors.other}`}>
-                    {t('cat.' + r.category)}
-                  </span>
                 </div>
               </div>
             </div>
@@ -196,37 +181,6 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
         </li>
       ))}
     </ul>
-  )
-}
-
-function CategoryBreakdown({ rows, total }: { rows: { label: string; amount: number; href: string }[]; total: number }){
-  const { lang,currency } = useI18n()
-  if (!rows.length) return null
-  return (
-    <div className="space-y-2.5">
-      {rows.map(r => {
-        const pct = total > 0 ? Math.round((r.amount / total) * 100) : 0
-        return (
-          <a
-            key={r.label}
-            href={r.href}
-            className={`${card} p-4 sm:p-5 hover:border-emerald-700/50 hover:shadow-sm transition-all group block`}
-          >
-            <div className="flex justify-between items-center gap-2 mb-2 text-base">
-              <span className="font-semibold text-stone-800 group-hover:text-emerald-800 transition-colors">{r.label}</span>
-              <span className="font-bold text-stone-900">{money(r.amount, lang,currency)}</span>
-            </div>
-            <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-emerald-600 group-hover:bg-emerald-700 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(pct, 100)}%` }}
-              />
-            </div>
-            <span className="text-xs text-stone-500 mt-1 block">{pct}% of total</span>
-          </a>
-        )
-      })}
-    </div>
   )
 }
 
@@ -276,7 +230,6 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [vendor, setVendor] = useState('')
   const [date, setDate] = useState('')
-  const [category, setCategory] = useState('inventory')
   const [currency, setCurrency] = useState('INR')
   const [items, setItems] = useState<Item[]>([])
   const [total, setTotal] = useState<string>('')
@@ -292,7 +245,6 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
     setReceipt(r)
     setVendor(r.vendor || '')
     setDate(r.date || '')
-    setCategory(r.category || 'inventory')
     setCurrency(r.currency || 'INR')
     setItems(r.items && r.items.length ? r.items.map(it => ({
       name: it.name || '',
@@ -438,7 +390,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
         vendor: trimmedVendor,
         date: trimmedDate,
         currency: currency || 'INR',
-        category: category || 'inventory',
+        category: receipt?.category || 'inventory',
         items: items
           .map(it => ({
             name: it.name.trim() || 'Item',
@@ -615,7 +567,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
                 <span>{t('rv.warn')}</span>
               </div>
 
-              {/* 1. Essential Ledger Entry: Shop Name, Date, Category */}
+              {/* 1. Essential Ledger Entry: Shop Name, Date */}
               <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-3.5">
                 <div className="border-b border-stone-200 pb-2">
                   <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
@@ -640,40 +592,19 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
                   </label>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block">
-                      <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
-                        {t('rv.date')} <span className="text-emerald-700 font-black">*</span>
-                      </span>
-                      <input
-                        type="date"
-                        className={field}
-                        value={date}
-                        onChange={e => setDate(e.target.value)}
-                        required
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
-                        {t('rv.category')}
-                      </span>
-                      <select
-                        className={field}
-                        value={category}
-                        onChange={e => setCategory(e.target.value)}
-                      >
-                        {CATEGORIES.map(c => (
-                          <option key={c} value={c}>
-                            {t('cat.' + c)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
+                <div>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
+                      {t('rv.date')} <span className="text-emerald-700 font-black">*</span>
+                    </span>
+                    <input
+                      type="date"
+                      className={field}
+                      value={date}
+                      onChange={e => setDate(e.target.value)}
+                      required
+                    />
+                  </label>
                 </div>
               </div>
 
@@ -812,15 +743,14 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
   const { t, lang,currency } = useI18n()
   const q = useLoad(() => Promise.all([
     api.summary(),
-    api.categories(),
     api.list({ status: 'pending' }),
     api.list({ status: 'confirmed' })
   ]), [refreshKey])
-  const s = q.d?.[0], c = q.d?.[1], p = q.d?.[2], confirmed = q.d?.[3]
+  const s = q.d?.[0], p = q.d?.[1], confirmed = q.d?.[2]
 
   return (
     <State {...q}>
-      {s && c && p && (
+      {s && p && (
         <div className="space-y-8">
           {/* Welcoming Dashboard Greeting & Prominent Action Button */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -976,21 +906,15 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
             )}
           </section>
 
-          {/* Spending Analytics: Categories & Top Vendors */}
-          <div className="grid gap-6 md:grid-cols-2">
+          {/* Top Vendors / Suppliers */}
+          {s.topVendors && s.topVendors.length > 0 && (
             <section>
-              <h2 className={h2}>{t('home.cats')}</h2>
-              <CategoryBreakdown
-                rows={c.map(x => ({
-                  label: t('cat.' + x.category),
-                  amount: x.amount,
-                  href: `#/ledger?category=${x.category}`
-                }))}
-                total={s.totalSpent ?? s.totalReceived ?? 0}
-              />
-            </section>
-            <section>
-              <h2 className={h2}>{t('home.vendors')}</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className={h2}>{t('home.vendors')}</h2>
+                <a href="#/ledger" className="text-sm font-semibold text-emerald-800 hover:underline">
+                  {t('home.viewAll')} →
+                </a>
+              </div>
               <TopVendorsList
                 rows={s.topVendors.map(v => ({
                   label: v.vendor,
@@ -999,7 +923,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                 }))}
               />
             </section>
-          </div>
+          )}
         </div>
       )}
     </State>
@@ -1069,8 +993,8 @@ function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
 function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
   const { t, lang } = useI18n()
   const p = new URLSearchParams(query)
-  const blank: Filters = { q: '', from: '', to: '', category: '', vendor: '' }
-  const [fl, setFl] = useState<Filters>({ ...blank, category: p.get('category') || '', vendor: p.get('vendor') || '' })
+  const blank: Filters = { q: '', from: '', to: '', vendor: '' }
+  const [fl, setFl] = useState<Filters>({ ...blank, vendor: p.get('vendor') || '' })
   const [ex, setEx] = useState<'idle' | 'busy' | 'ok' | 'err'>('idle')
 
   const vendors = useLoad(() => api.summary(), [refreshKey])
@@ -1115,8 +1039,8 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
       </div>
 
       {/* Filter controls */}
-      <div className={`${card} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
-        <div className="sm:col-span-2 lg:col-span-1">
+      <div className={`${card} grid gap-4 sm:grid-cols-2 lg:grid-cols-4`}>
+        <div className="sm:col-span-2">
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.search')}</span>
             <div className="relative">
@@ -1134,17 +1058,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
           </label>
         </div>
 
-        <div>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.category')}</span>
-            <select className={field} value={fl.category} onChange={e => up('category', e.target.value)}>
-              <option value="">{t('cat.all')}</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{t('cat.' + c)}</option>)}
-            </select>
-          </label>
-        </div>
-
-        <div>
+        <div className="sm:col-span-2">
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.vendor')}</span>
             <select className={field} value={fl.vendor} onChange={e => up('vendor', e.target.value)}>
@@ -1168,7 +1082,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
           </label>
         </div>
 
-        <div className="flex items-end">
+        <div className="flex items-end sm:col-span-2 lg:col-span-2">
           <button className={`${ghost} w-full`} onClick={() => setFl(blank)}>
             {t('lg.clear')}
           </button>
@@ -1261,7 +1175,7 @@ function Ask({ onSelectReceipt }: { onSelectReceipt: (r: Receipt) => void }){
           {lang === 'hi' ? 'सुझाव (पूछने के लिए छुएँ)' : 'Suggested Questions (Tap to ask)'}
         </span>
         <div className="flex flex-col gap-2">
-          {[1, 2, 3, 4, 5].map(n => (
+          {[1, 3, 4, 5].map(n => (
             <button
               key={n}
               className={`${ghost} text-left text-stone-700 hover:text-emerald-900 hover:border-emerald-700/60 justify-start py-3 px-4 text-sm sm:text-base`}

@@ -105,7 +105,7 @@ export const m={
   list:(f:Filters)=>db.filter(r=>(f.status==='confirmed'?r.status==='confirmed':f.status==='pending'?r.status!=='confirmed':true)
     &&(!f.type||r.type===f.type)
     &&(!f.q||(r.vendor+r.items.map(i=>i.name).join(' ')).toLowerCase().includes(f.q.toLowerCase()))
-    &&(!f.from||r.date>=f.from)&&(!f.to||r.date<=f.to)&&(!f.category||r.category===f.category)&&(!f.vendor||r.vendor===f.vendor)).sort((a,b)=>b.date.localeCompare(a.date)),
+    &&(!f.from||r.date>=f.from)&&(!f.to||r.date<=f.to)&&(!f.vendor||r.vendor===f.vendor)).sort((a,b)=>b.date.localeCompare(a.date)),
   summary:():Summary=>({
     totalReceived:sum(confIncome()),
     totalSpent:sum(confExpense()),
@@ -125,7 +125,6 @@ export const m={
     if(has('waiting','review','जांच','जाँच','सत्यापन')){const p=db.filter(r=>r.status!=='confirmed');return A('qa.ans.review',{n:p.length},p)}
     if(has('between','के बीच')){const rs=confIncome().filter(r=>r.date>='2026-10-01'&&r.date<='2026-10-15');return A('qa.ans.dates',{amount:f(sum(rs))},rs)}
     if(has('customer','shop','vendor','दुकान','ग्राहक')){const g=group(r=>r.vendor)[0];return A('qa.ans.vendor',{name:g.key,amount:f(g.amount)},conf().filter(r=>r.vendor===g.key))}
-    if(has('type','category','प्रकार','श्रेणी')){const g=group(r=>r.category)[0];return A('qa.ans.category',{name:d['cat.'+g.key]||g.key,amount:f(g.amount)},conf().filter(r=>r.category===g.key))}
     if(has('total','कुल','received','आवक','कमाई'))return A('qa.ans.total',{amount:f(sum(confIncome())),n:confIncome().length},confIncome())
     return {answer:d['qa.unsupported'],supported:false,receipts:[]}
   }
