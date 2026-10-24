@@ -59,6 +59,18 @@ function MicrophoneIcon({className="w-5 h-5"}:{className?:string}){
 function CameraIcon({className="w-5 h-5"}:{className?:string}){
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
 }
+function SwitchCameraIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+}
+function FolderIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+}
+function CheckIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+}
+function RefreshCwIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+}
 
 // Design system tokens: high-contrast, large touch targets tailored for budget mobile screens in direct sunlight
 const btn = 'min-h-[48px] px-5 sm:px-6 rounded-xl text-base font-bold focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
@@ -1651,10 +1663,298 @@ function Home({ onAddReceipt, onOpenVoice, onSelectReceipt, refreshKey }: { onAd
   )
 }
 
+interface CameraCaptureModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onCapture: (f: File) => void
+}
+
+function CameraCaptureModal({ isOpen, onClose, onCapture }: CameraCaptureModalProps){
+  const { t } = useI18n()
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+  const [isStarting, setIsStarting] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null)
+  const [capturedUrl, setCapturedUrl] = useState<string | null>(null)
+
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const nativeCameraInputRef = useRef<HTMLInputElement>(null)
+
+  const stopTracks = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop()
+        } catch {
+          // ignore
+        }
+      })
+      streamRef.current = null
+    }
+  }, [])
+
+  const startCamera = useCallback(async (facing: 'environment' | 'user') => {
+    stopTracks()
+    setCameraError(null)
+    setIsStarting(true)
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setIsStarting(false)
+      setCameraError(t('up.cameraError'))
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play().catch(() => {})
+      }
+      setIsStarting(false)
+    } catch (err) {
+      console.warn('Camera initialization error:', err)
+      setIsStarting(false)
+      // Attempt fallback with basic video constraint
+      try {
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        })
+        streamRef.current = fallbackStream
+        if (videoRef.current) {
+          videoRef.current.srcObject = fallbackStream
+          await videoRef.current.play().catch(() => {})
+        }
+      } catch (fallbackErr) {
+        console.warn('Fallback camera initialization error:', fallbackErr)
+        setCameraError(t('up.cameraError'))
+      }
+    }
+  }, [stopTracks, t])
+
+  useEffect(() => {
+    if (isOpen && !capturedBlob) {
+      startCamera(facingMode)
+    }
+    return () => {
+      stopTracks()
+      if (capturedUrl) {
+        URL.revokeObjectURL(capturedUrl)
+      }
+    }
+  }, [isOpen, facingMode, startCamera, stopTracks])
+
+  if (!isOpen) return null
+
+  const handleTakePhoto = () => {
+    const video = videoRef.current
+    if (!video || !video.videoWidth) return
+
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    canvas.toBlob(blob => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      setCapturedBlob(blob)
+      setCapturedUrl(url)
+      stopTracks()
+    }, 'image/jpeg', 0.92)
+  }
+
+  const handleRetake = () => {
+    if (capturedUrl) {
+      URL.revokeObjectURL(capturedUrl)
+    }
+    setCapturedBlob(null)
+    setCapturedUrl(null)
+    startCamera(facingMode)
+  }
+
+  const handleConfirmPhoto = () => {
+    if (!capturedBlob) return
+    const file = new File([capturedBlob], `receipt_${Date.now()}.jpg`, { type: 'image/jpeg' })
+    if (capturedUrl) {
+      URL.revokeObjectURL(capturedUrl)
+    }
+    onCapture(file)
+    onClose()
+  }
+
+  const handleSwitchCamera = () => {
+    const next = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(next)
+  }
+
+  const handleNativeCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      onCapture(file)
+      onClose()
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-3 sm:p-6 animate-fadeIn">
+      {/* Top Header */}
+      <div className="flex items-center justify-between text-white max-w-xl w-full mx-auto pb-2 border-b border-stone-800">
+        <div className="flex items-center gap-2">
+          <CameraIcon className="w-6 h-6 text-emerald-400" />
+          <h2 className="text-lg sm:text-xl font-bold">{t('up.cameraTitle')}</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => { stopTracks(); onClose() }}
+          className="p-2 text-stone-300 hover:text-white rounded-full hover:bg-stone-800 transition-all cursor-pointer"
+          aria-label={t('common.close')}
+        >
+          <XIcon className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Viewfinder / Preview Body */}
+      <div className="relative flex-1 max-w-xl w-full mx-auto my-3 rounded-2xl overflow-hidden bg-stone-950 flex items-center justify-center border-2 border-stone-800 shadow-2xl min-h-[320px]">
+        {capturedUrl ? (
+          <div className="relative w-full h-full flex items-center justify-center bg-black">
+            <img src={capturedUrl} alt="Captured receipt" className="max-h-full max-w-full object-contain" />
+            <div className="absolute top-3 left-3 bg-emerald-700/90 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-xs flex items-center gap-1.5 shadow-md">
+              <CheckIcon className="w-4 h-4" />
+              <span>{t('up.done')}</span>
+            </div>
+          </div>
+        ) : cameraError ? (
+          <div className="text-center p-6 text-stone-300 max-w-md mx-auto space-y-4">
+            <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+              <CameraIcon className="w-8 h-8" />
+            </div>
+            <p className="text-sm sm:text-base text-stone-200">{cameraError}</p>
+            <button
+              type="button"
+              onClick={() => nativeCameraInputRef.current?.click()}
+              className={`${prominentBtn} bg-emerald-600 hover:bg-emerald-700 text-white w-full`}
+            >
+              <CameraIcon className="w-5 h-5" />
+              <span>{t('up.nativeCamera')}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="relative w-full h-full flex items-center justify-center">
+            {isStarting && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10 text-white gap-3">
+                <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm font-semibold">{t('common.loading')}</span>
+              </div>
+            )}
+            <video
+              ref={videoRef}
+              playsInline
+              autoPlay
+              muted
+              className="w-full h-full object-cover"
+            />
+            {/* Guide overlay */}
+            <div className="absolute inset-4 sm:inset-8 border-2 border-dashed border-emerald-400/70 rounded-xl pointer-events-none flex flex-col justify-between p-3">
+              <span className="bg-black/60 backdrop-blur-xs text-emerald-300 text-xs sm:text-sm font-medium px-3 py-1 rounded-md self-center">
+                {t('up.cameraGuide')}
+              </span>
+              <div className="flex justify-between text-emerald-400/80 text-xs px-1">
+                <span>⌜ ⌝</span>
+                <span>⌞ ⌟</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Hidden input for mobile phone native camera */}
+      <input
+        ref={nativeCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        onChange={handleNativeCameraChange}
+      />
+
+      {/* Bottom Controls */}
+      <div className="max-w-xl w-full mx-auto pt-2">
+        {capturedUrl ? (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleRetake}
+              className={`${ghost} flex-1 text-white border-stone-600 bg-stone-900 hover:bg-stone-800 text-base sm:text-lg`}
+            >
+              <RefreshCwIcon className="w-5 h-5" />
+              <span>{t('up.retake')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmPhoto}
+              className={`${prominentBtn} flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-base sm:text-lg`}
+            >
+              <CheckIcon className="w-5 h-5" />
+              <span>{t('up.usePhoto')}</span>
+            </button>
+          </div>
+        ) : !cameraError ? (
+          <div className="flex items-center justify-between px-4 sm:px-8">
+            {/* Switch Camera */}
+            <button
+              type="button"
+              onClick={handleSwitchCamera}
+              className="p-3.5 rounded-full bg-stone-800/80 hover:bg-stone-700 text-white transition-all cursor-pointer"
+              title={t('up.switchCamera')}
+            >
+              <SwitchCameraIcon className="w-6 h-6" />
+            </button>
+
+            {/* Shutter Button */}
+            <button
+              type="button"
+              onClick={handleTakePhoto}
+              disabled={isStarting}
+              className="w-18 h-18 sm:w-20 sm:h-20 rounded-full border-4 border-white flex items-center justify-center bg-white/20 hover:bg-white/40 active:scale-95 transition-all cursor-pointer shadow-lg disabled:opacity-50"
+              aria-label={t('up.capture')}
+            >
+              <div className="w-14 h-14 sm:w-15 sm:h-15 rounded-full bg-emerald-500 hover:bg-emerald-400 transition-all border-2 border-white shadow-inner" />
+            </button>
+
+            {/* Native Camera App trigger */}
+            <button
+              type="button"
+              onClick={() => nativeCameraInputRef.current?.click()}
+              className="p-3.5 rounded-full bg-stone-800/80 hover:bg-stone-700 text-white transition-all cursor-pointer text-xs flex flex-col items-center"
+              title={t('up.nativeCamera')}
+            >
+              <CameraIcon className="w-6 h-6" />
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
   const { t } = useI18n()
   const [dragActive, setDragActive] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [isCameraOpen, setIsCameraOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const nativeCameraInputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (f?: File) => {
     if (!f) return
@@ -1672,8 +1972,70 @@ function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
         <p className="text-stone-600 text-base sm:text-lg">{t('up.help')}</p>
       </div>
 
+      {/* Two Top Action Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Take Photo with Camera */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setIsCameraOpen(true)}
+          onKeyDown={e => e.key === 'Enter' && setIsCameraOpen(true)}
+          className="rounded-2xl border-2 border-emerald-600 bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-5 sm:p-6 text-left shadow-sm hover:shadow-md hover:border-emerald-700 transition-all cursor-pointer group flex flex-col justify-between"
+        >
+          <div>
+            <div className="w-12 h-12 rounded-xl bg-emerald-700 text-white flex items-center justify-center mb-4 group-hover:scale-105 transition-transform shadow-xs">
+              <CameraIcon className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-black text-emerald-950 mb-1">
+              {t('up.takePhoto')}
+            </h3>
+            <p className="text-emerald-800/80 text-xs sm:text-sm font-medium mb-4">
+              {t('up.takePhotoSub')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); setIsCameraOpen(true) }}
+            className={`${prominentBtn} w-full bg-emerald-700 hover:bg-emerald-800 text-white text-base py-3`}
+          >
+            <CameraIcon className="w-5 h-5" />
+            <span>{t('up.takePhoto')}</span>
+          </button>
+        </div>
+
+        {/* Choose from Files / Gallery */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
+          className="rounded-2xl border-2 border-stone-200 bg-white p-5 sm:p-6 text-left shadow-2xs hover:shadow-sm hover:border-stone-400 transition-all cursor-pointer group flex flex-col justify-between"
+        >
+          <div>
+            <div className="w-12 h-12 rounded-xl bg-stone-100 text-stone-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <FolderIcon className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-stone-900 mb-1">
+              {t('up.chooseFile')}
+            </h3>
+            <p className="text-stone-600 text-xs sm:text-sm mb-4">
+              {t('up.chooseFileSub')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}
+            className={`${ghost} w-full text-base py-3`}
+          >
+            <UploadCloudIcon className="w-5 h-5 text-stone-600" />
+            <span>{t('up.chooseFile')}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Drag & Drop File Zone */}
       <div
-        className={`${card} border-2 border-dashed ${dragActive ? 'border-emerald-600 bg-emerald-50/50' : 'border-stone-300'} hover:border-emerald-600/70 p-8 sm:p-12 text-center transition-all cursor-pointer`}
+        className={`${card} border-2 border-dashed ${dragActive ? 'border-emerald-600 bg-emerald-50/50' : 'border-stone-300'} hover:border-emerald-600/70 p-6 sm:p-10 text-center transition-all cursor-pointer`}
         onDragOver={e => { e.preventDefault(); setDragActive(true) }}
         onDragLeave={() => setDragActive(false)}
         onDrop={e => {
@@ -1681,34 +2043,59 @@ function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
           setDragActive(false)
           handleFile(e.dataTransfer.files?.[0])
         }}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => fileInputRef.current?.click()}
       >
-        <UploadCloudIcon className="w-14 h-14 mx-auto text-emerald-700 mb-4" />
-        <h3 className="text-xl font-bold text-stone-900 mb-2">
+        <UploadCloudIcon className="w-12 h-12 mx-auto text-emerald-700 mb-3" />
+        <h4 className="text-base sm:text-lg font-bold text-stone-900 mb-1">
           {t('up.choose')}
-        </h3>
-        <p className="text-stone-600 text-sm mb-4">
+        </h4>
+        <p className="text-stone-600 text-xs sm:text-sm mb-4">
           Click or drop bill photos, scanned copies, or PDF invoices
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"
-            className={`${prominentBtn} bg-emerald-700 hover:bg-emerald-800 text-white`}
-            onClick={e => { e.stopPropagation(); inputRef.current?.click() }}
+            className={`${btn} bg-emerald-700 hover:bg-emerald-800 text-white text-sm sm:text-base`}
+            onClick={e => { e.stopPropagation(); setIsCameraOpen(true) }}
           >
-            <CameraIcon className="w-5 h-5" />
-            <span>{t('up.choosePicture')}</span>
+            <CameraIcon className="w-4 h-4" />
+            <span>{t('up.takePhoto')}</span>
+          </button>
+          <button
+            type="button"
+            className={`${ghost} text-sm sm:text-base`}
+            onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}
+          >
+            <FolderIcon className="w-4 h-4" />
+            <span>{t('up.chooseFile')}</span>
           </button>
         </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-          className="sr-only"
-          onChange={e => handleFile(e.target.files?.[0])}
-        />
         <p className="text-xs text-stone-400 mt-4">JPG, PNG, PDF up to 10MB</p>
       </div>
+
+      {/* Hidden file inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+        className="sr-only"
+        onChange={e => handleFile(e.target.files?.[0])}
+      />
+      <input
+        ref={nativeCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        onChange={e => handleFile(e.target.files?.[0])}
+      />
+
+      {/* Live Camera Viewfinder Modal */}
+      <CameraCaptureModal
+        isOpen={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onCapture={handleFile}
+      />
     </div>
   )
 }
@@ -2323,7 +2710,7 @@ export default function App(){
           <SettingsPage account={account} onAccountUpdated={updated=>{setAccount(updated);setCurrency(updated.currency);setLang(updated.language)}} onSignOut={handleSignOut}/>
         ) : (
           <Home
-            onAddReceipt={() => hiddenFileInputRef.current?.click()}
+            onAddReceipt={() => { location.hash = '#/upload' }}
             onOpenVoice={() => setVoiceModalOpen(true)}
             onSelectReceipt={r => setActiveModal({ id: r.id })}
             refreshKey={refreshKey}

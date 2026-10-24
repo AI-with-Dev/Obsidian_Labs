@@ -9,7 +9,12 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
-import psycopg
+try:
+    import psycopg
+except ImportError:
+    class _DummyPsycopg:
+        IntegrityError = type("IntegrityError", (Exception,), {})
+    psycopg = _DummyPsycopg()
 
 from backend.app.database import get_db
 from backend.app.models import ApiResponse

@@ -3,8 +3,12 @@ from contextlib import contextmanager
 from typing import Any, Generator
 from urllib.parse import urlsplit
 
-import psycopg
-from psycopg.rows import dict_row
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except ImportError:
+    psycopg = None
+    dict_row = None
 
 from backend.app.config import settings
 
