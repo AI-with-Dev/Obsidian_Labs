@@ -53,13 +53,13 @@ function ChevronDownIcon({className="w-4 h-4"}:{className?:string}){
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
 }
 
-// Design system tokens matching the warm cream & emerald green theme with crisp, sharp edges
-const btn = 'min-h-[46px] px-5 sm:px-6 rounded-xs text-base font-semibold focus-visible:outline-2 focus-visible:outline-emerald-500 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
-const primary = `${btn} bg-emerald-700 text-white hover:bg-emerald-800 shadow-2xs`
-const prominentBtn = `${btn} bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs text-base sm:text-lg font-bold py-3.5`
-const ghost = `${btn} border border-stone-300 text-stone-800 bg-white hover:bg-stone-50 hover:border-emerald-700/40 shadow-2xs`
-const field = 'w-full min-h-[46px] px-3.5 sm:px-4 rounded-xs border border-stone-300 bg-white text-base text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:bg-stone-100 disabled:text-stone-500 transition-all'
-const card = 'block rounded-xs bg-white border border-stone-200/90 shadow-2xs hover:shadow-xs transition-all p-5 sm:p-6'
+// Design system tokens: high-contrast, large touch targets tailored for budget mobile screens in direct sunlight
+const btn = 'min-h-[48px] px-5 sm:px-6 rounded-xl text-base font-bold focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
+const primary = `${btn} bg-emerald-700 text-white hover:bg-emerald-800 shadow-sm`
+const prominentBtn = `${btn} min-h-[54px] sm:min-h-[58px] bg-emerald-700 text-white hover:bg-emerald-800 shadow-md text-lg sm:text-xl font-black py-3.5`
+const ghost = `${btn} border-2 border-stone-300 text-stone-800 bg-white hover:bg-stone-50 hover:border-emerald-700/60 shadow-2xs`
+const field = 'w-full min-h-[48px] sm:min-h-[50px] px-3.5 sm:px-4 rounded-xl border-2 border-stone-300 bg-white text-base font-semibold text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 disabled:bg-stone-100 disabled:text-stone-500 transition-all placeholder:text-stone-400'
+const card = 'block rounded-2xl bg-white border-2 border-stone-200/90 shadow-2xs hover:shadow-xs transition-all p-5 sm:p-6'
 const h1 = 'text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 mb-1'
 const h2 = 'text-xl sm:text-2xl font-bold tracking-tight text-stone-900 mb-4'
 
@@ -275,16 +275,11 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
 
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [vendor, setVendor] = useState('')
-  const [invoiceNo, setInvoiceNo] = useState('')
   const [date, setDate] = useState('')
   const [category, setCategory] = useState('inventory')
-  const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [currency, setCurrency] = useState('INR')
   const [items, setItems] = useState<Item[]>([])
-  const [tax, setTax] = useState<string>('')
-  const [discount, setDiscount] = useState<string>('')
   const [total, setTotal] = useState<string>('')
-  const [notes, setNotes] = useState('')
 
   const [showImage, setShowImage] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -292,25 +287,18 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
   const [dupResolving, setDupResolving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Populate form fields from extracted/loaded receipt
+  // Populate form fields with essential everyday details
   const populate = (r: Receipt) => {
     setReceipt(r)
     setVendor(r.vendor || '')
-    setInvoiceNo(r.invoiceNumber || '')
     setDate(r.date || '')
     setCategory(r.category || 'inventory')
-    setPaymentMethod(r.paymentMethod || 'Cash')
     setCurrency(r.currency || 'INR')
     setItems(r.items && r.items.length ? r.items.map(it => ({
       name: it.name || '',
       amount: it.amount || 0,
-      quantity: it.quantity || 1,
-      unitPrice: it.unitPrice || it.amount || 0,
-    })) : [{ name: '', amount: 0, quantity: 1, unitPrice: 0 }])
-    setTax(r.tax !== undefined && r.tax !== null ? String(r.tax) : '')
-    setDiscount(r.discount !== undefined && r.discount !== null ? String(r.discount) : '')
+    })) : [{ name: '', amount: 0 }])
     setTotal(r.total !== null && r.total !== undefined ? String(r.total) : '')
-    setNotes(r.notes || '')
   }
 
   // Initial fetch / OCR process
@@ -354,39 +342,31 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
   }, [file, receiptId])
 
   // Subtotal calculation
-  const subtotal = items.reduce((acc, it) => acc + (Number(it.amount) || 0), 0)
-
-  // Item field update with auto-calculation of line amount if qty/price edited
+  // Item field update
   const updateItem = (index: number, patch: Partial<Item>) => {
     setItems(prev => {
       const copy = [...prev]
-      const current = { ...copy[index], ...patch }
-      if (patch.quantity !== undefined || patch.unitPrice !== undefined) {
-        const q = Number(current.quantity) || 1
-        const p = Number(current.unitPrice) || 0
-        if (p > 0) {
-          current.amount = Math.round(q * p * 100) / 100
-        }
-      }
-      copy[index] = current
+      copy[index] = { ...copy[index], ...patch }
       return copy
     })
   }
 
   const addItem = () => {
-    setItems(prev => [...prev, { name: '', amount: 0, quantity: 1, unitPrice: 0 }])
+    setItems(prev => [...prev, { name: '', amount: 0 }])
   }
 
   const removeItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Recalculate suggested total when items, tax, or discount change
+  // Calculate items sum
+  const itemsTotal = items.reduce((acc, it) => acc + (Number(it.amount) || 0), 0)
+
+  // Auto-fill total from items sum if desired
   const applyCalculatedTotal = () => {
-    const tVal = Number(tax) || 0
-    const dVal = Number(discount) || 0
-    const calc = Math.max(0, subtotal + tVal - dVal)
-    setTotal(String(Math.round(calc * 100) / 100))
+    if (itemsTotal > 0) {
+      setTotal(String(Math.round(itemsTotal * 100) / 100))
+    }
   }
 
   // Handle duplicate decision: Keep as separate
@@ -439,7 +419,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
 
     setSubmitError(null)
 
-    // Validation
+    // Validation: simple essential merchant details
     const trimmedVendor = vendor.trim()
     const trimmedDate = date.trim()
     const numericTotal = total === '' ? null : Number(total)
@@ -452,7 +432,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
     setIsSubmitting(true)
 
     try {
-      // 1. Prepare finalized receipt payload using user's edited values
+      // 1. Prepare finalized receipt payload using essential details
       const finalized: Receipt = {
         ...receipt,
         vendor: trimmedVendor,
@@ -463,17 +443,9 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
           .map(it => ({
             name: it.name.trim() || 'Item',
             amount: Number(it.amount) || 0,
-            quantity: Number(it.quantity) || 1,
-            unitPrice: Number(it.unitPrice) || Number(it.amount) || 0,
           }))
           .filter(it => it.name.length > 0 || it.amount > 0),
         total: numericTotal,
-        invoiceNumber: invoiceNo.trim() || undefined,
-        subtotal,
-        tax: tax !== '' ? Number(tax) : undefined,
-        discount: discount !== '' ? Number(discount) : undefined,
-        paymentMethod: paymentMethod || undefined,
-        notes: notes.trim() || undefined,
         status: 'confirmed',
         flags: [],
       }
@@ -643,48 +615,36 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
                 <span>{t('rv.warn')}</span>
               </div>
 
-              {/* 1. RECEIPT DETAILS SECTION */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500 border-b border-stone-200 pb-1">
-                  1. {t('rv.details')}
-                </h3>
+              {/* 1. Essential Ledger Entry: Shop Name, Date, Category */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-3.5">
+                <div className="border-b border-stone-200 pb-2">
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                    <StoreIcon className="w-4 h-4 text-emerald-700" />
+                    {t('rv.details')}
+                  </h3>
+                </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.vendor')} <span className="text-rose-600">*</span>
-                      </span>
-                      <input
-                        type="text"
-                        className={field}
-                        placeholder="e.g. Sharma Traders"
-                        value={vendor}
-                        onChange={e => setVendor(e.target.value)}
-                        required
-                      />
-                    </label>
-                  </div>
+                <div>
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center justify-between text-sm sm:text-base font-bold text-stone-900">
+                      <span>{t('rv.vendor')} <span className="text-emerald-700 font-black">*</span></span>
+                    </span>
+                    <input
+                      type="text"
+                      className={field}
+                      placeholder="e.g. Sharma Traders"
+                      value={vendor}
+                      onChange={e => setVendor(e.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.invoiceNo')}
-                      </span>
-                      <input
-                        type="text"
-                        className={field}
-                        placeholder="e.g. INV-1049"
-                        value={invoiceNo}
-                        onChange={e => setInvoiceNo(e.target.value)}
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.date')} <span className="text-rose-600">*</span>
+                      <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
+                        {t('rv.date')} <span className="text-emerald-700 font-black">*</span>
                       </span>
                       <input
                         type="date"
@@ -698,7 +658,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
 
                   <div>
                     <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
+                      <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
                         {t('rv.category')}
                       </span>
                       <select
@@ -714,36 +674,19 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
                       </select>
                     </label>
                   </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.paymentMethod')}
-                      </span>
-                      <select
-                        className={field}
-                        value={paymentMethod}
-                        onChange={e => setPaymentMethod(e.target.value)}
-                      >
-                        <option value="Cash">{t('rv.cash')}</option>
-                        <option value="UPI">{t('rv.upi')}</option>
-                        <option value="Card">{t('rv.card')}</option>
-                        <option value="Credit">{t('rv.credit')}</option>
-                      </select>
-                    </label>
-                  </div>
                 </div>
               </div>
 
-              {/* 2. ITEMS SECTION */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-stone-200 pb-1">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500">
-                    2. {t('rv.itemsSection')}
+              {/* 2. Items & Goods Description */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                    <ReceiptIcon className="w-4 h-4 text-emerald-700" />
+                    {t('rv.itemsSection')}
                   </h3>
                   <button
                     type="button"
-                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                    className="text-xs sm:text-sm font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer px-2.5 py-1 rounded-lg hover:bg-emerald-50 transition-colors"
                     onClick={addItem}
                   >
                     {t('rv.addItem')}
@@ -752,150 +695,74 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
 
                 <div className="space-y-2.5">
                   {items.map((it, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded-xl border border-stone-200/90 shadow-2xs space-y-2">
-                      <div className="flex items-center gap-2">
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        className={`${field} flex-1 text-sm sm:text-base`}
+                        placeholder={t('rv.item')}
+                        value={it.name}
+                        onChange={e => updateItem(idx, { name: e.target.value })}
+                      />
+                      <div className="w-28 sm:w-36 shrink-0 relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-stone-400">₹</span>
                         <input
-                          type="text"
-                          className={`${field} flex-1`}
-                          placeholder={t('rv.item')}
-                          value={it.name}
-                          onChange={e => updateItem(idx, { name: e.target.value })}
+                          type="number"
+                          inputMode="decimal"
+                          step="any"
+                          min="0"
+                          placeholder="0.00"
+                          className={`${field} pl-6 text-sm sm:text-base font-bold text-stone-900`}
+                          value={it.amount || ''}
+                          onChange={e => updateItem(idx, { amount: Number(e.target.value) || 0 })}
                         />
+                      </div>
+                      {items.length > 1 && (
                         <button
                           type="button"
-                          className="w-9 h-9 rounded-xl text-stone-400 hover:text-rose-700 hover:bg-rose-50 flex items-center justify-center shrink-0 transition-colors"
+                          className="w-10 h-10 rounded-xl text-stone-400 hover:text-rose-700 hover:bg-rose-50 flex items-center justify-center shrink-0 transition-colors font-bold text-base cursor-pointer"
                           onClick={() => removeItem(idx)}
                           aria-label={t('rv.removeItem')}
                         >
                           ✕
                         </button>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div>
-                          <label className="block text-stone-500 mb-0.5">{t('rv.qty')}</label>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="any"
-                            min="0"
-                            className={`${field} min-h-[38px] text-sm px-2`}
-                            value={it.quantity ?? 1}
-                            onChange={e => updateItem(idx, { quantity: Number(e.target.value) })}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-stone-500 mb-0.5">{t('rv.price')} (₹)</label>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="any"
-                            min="0"
-                            className={`${field} min-h-[38px] text-sm px-2`}
-                            value={it.unitPrice ?? it.amount ?? 0}
-                            onChange={e => updateItem(idx, { unitPrice: Number(e.target.value) })}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-stone-500 mb-0.5">{t('rv.amount')} (₹)</label>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="any"
-                            min="0"
-                            className={`${field} min-h-[38px] text-sm px-2 font-bold text-stone-900`}
-                            value={it.amount}
-                            onChange={e => updateItem(idx, { amount: Number(e.target.value) })}
-                          />
-                        </div>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* 3. AMOUNT SUMMARY SECTION */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-stone-200 pb-1">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500">
-                    3. {t('rv.summary')}
-                  </h3>
-                  <button
-                    type="button"
-                    className="text-xs text-stone-500 hover:text-stone-800 underline"
-                    onClick={applyCalculatedTotal}
-                  >
-                    {t('rv.autoFill')}
-                  </button>
+              {/* 3. High-Contrast Prominent Total Card */}
+              <div className="bg-emerald-50/85 rounded-2xl border-2 border-emerald-600/90 p-4 sm:p-5 shadow-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="receipt-total-input" className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-emerald-950 flex items-center gap-1.5">
+                    <WalletIcon className="w-5 h-5 text-emerald-800" />
+                    <span>{t('rv.total')} <span className="text-rose-600">*</span></span>
+                  </label>
+                  {itemsTotal > 0 && (
+                    <button
+                      type="button"
+                      onClick={applyCalculatedTotal}
+                      className="text-xs sm:text-sm font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
+                    >
+                      {t('rv.autoFill')} (₹{itemsTotal.toLocaleString('en-IN')})
+                    </button>
+                  )}
                 </div>
 
-                <div className="bg-white p-4 rounded-2xl border border-stone-200/90 space-y-3">
-                  <div className="flex justify-between items-center text-sm text-stone-600">
-                    <span>{t('rv.subtotal')}:</span>
-                    <span className="font-semibold text-stone-800">{money(subtotal, lang, currency)}</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-stone-600 mb-1">{t('rv.tax')} (₹)</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        placeholder="0.00"
-                        className={`${field} min-h-[42px] text-sm`}
-                        value={tax}
-                        onChange={e => setTax(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-stone-600 mb-1">{t('rv.discount')} (₹)</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        placeholder="0.00"
-                        className={`${field} min-h-[42px] text-sm`}
-                        value={discount}
-                        onChange={e => setDiscount(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-stone-100">
-                    <label className="block">
-                      <span className="mb-1 flex items-center justify-between text-base font-bold text-stone-900">
-                        <span>{t('rv.total')} (₹) <span className="text-rose-600">*</span></span>
-                        <span className="text-xs font-normal text-stone-500">Required</span>
-                      </span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        className={`${field} text-xl font-extrabold text-emerald-950 border-emerald-600/50 focus:border-emerald-700 bg-emerald-50/20`}
-                        placeholder="0.00"
-                        value={total}
-                        onChange={e => setTotal(e.target.value)}
-                        required
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-stone-600">{t('rv.notes')}</span>
-                      <input
-                        type="text"
-                        className={`${field} min-h-[42px] text-sm`}
-                        placeholder="Optional remarks (e.g. Paid by cashier)"
-                        value={notes}
-                        onChange={e => setNotes(e.target.value)}
-                      />
-                    </label>
-                  </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-2xl font-black text-emerald-700">₹</span>
+                  <input
+                    id="receipt-total-input"
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="0"
+                    className="w-full min-h-[56px] sm:min-h-[60px] pl-9 pr-4 rounded-xl border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 text-2xl sm:text-3xl font-black text-emerald-950 bg-white shadow-inner"
+                    placeholder="0.00"
+                    value={total}
+                    onChange={e => setTotal(e.target.value)}
+                    required
+                  />
                 </div>
               </div>
 
@@ -903,13 +770,13 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
           )}
         </div>
 
-        {/* Modal Footer / Prominent Add Receipt Button */}
+        {/* Modal Footer / Large Touch-Friendly Save & Confirm Button */}
         {!loading && !initError && receipt?.status !== 'duplicate' && (
-          <div className="p-4 sm:p-5 border-t border-stone-200/80 bg-white space-y-2">
+          <div className="p-4 sm:p-5 border-t border-stone-200/80 bg-white space-y-2.5">
             <button
               type="submit"
               form="review-receipt-form"
-              className={`${prominentBtn} w-full`}
+              className="w-full min-h-[54px] sm:min-h-[58px] bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-lg sm:text-xl font-black rounded-xl shadow-md flex items-center justify-center gap-2.5 cursor-pointer transition-all active:scale-[0.99] disabled:opacity-50"
               disabled={isSubmitting}
             >
               {isSubmitting ? (
@@ -919,7 +786,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
                 </>
               ) : (
                 <>
-                  <CheckCircleIcon className="w-5 h-5" />
+                  <CheckCircleIcon className="w-6 h-6 text-emerald-200" />
                   <span>{t('rv.addReceipt')}</span>
                 </>
               )}
@@ -927,7 +794,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
             <div className="text-center">
               <button
                 type="button"
-                className="text-xs text-stone-500 hover:text-stone-800 underline py-1"
+                className="text-xs sm:text-sm font-semibold text-stone-500 hover:text-stone-800 underline py-1.5 cursor-pointer"
                 disabled={isSubmitting}
                 onClick={onClose}
               >

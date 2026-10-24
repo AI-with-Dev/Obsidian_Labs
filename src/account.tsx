@@ -88,12 +88,6 @@ export function AuthPage({ error, onRetry, onAuthenticated }: AuthPageProps) {
               <label className={label}>{t('auth.phone')}
                 <input className={input} type="tel" autoComplete="tel" maxLength={40} value={setup.phone} onChange={e => updateSetup('phone', e.target.value)} />
               </label>
-              <label className={label}>{t('auth.gstin')}
-                <input className={input} autoComplete="off" maxLength={20} value={setup.gstin} onChange={e => updateSetup('gstin', e.target.value)} />
-              </label>
-              <label className={label}>{t('auth.address')}
-                <textarea className={`${input} min-h-20 py-3`} autoComplete="street-address" maxLength={300} value={setup.address} onChange={e => updateSetup('address', e.target.value)} />
-              </label>
             </>
           )}
 
@@ -322,16 +316,8 @@ export function SettingsPage({ account, onAccountUpdated, onSignOut }: SettingsP
             <input className={input} type="password" autoComplete="current-password" required value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
           </label>
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className={label}>{t('auth.phone')}
-            <input className={input} type="tel" autoComplete="tel" maxLength={40} value={profile.phone} onChange={e => update('phone', e.target.value)} />
-          </label>
-          <label className={label}>{t('auth.gstin')}
-            <input className={input} maxLength={20} value={profile.gstin} onChange={e => update('gstin', e.target.value)} />
-          </label>
-        </div>
-        <label className={label}>{t('auth.address')}
-          <textarea className={`${input} min-h-20 py-3`} autoComplete="street-address" maxLength={300} value={profile.address} onChange={e => update('address', e.target.value)} />
+        <label className={label}>{t('auth.phone')}
+          <input className={input} type="tel" autoComplete="tel" maxLength={40} value={profile.phone} onChange={e => update('phone', e.target.value)} />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className={label}>{t('auth.language')}
