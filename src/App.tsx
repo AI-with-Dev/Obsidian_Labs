@@ -4,6 +4,7 @@ import * as api from './api'
 import {Account} from './api'
 import {AuthPage,SettingsPage} from './account'
 import {CATEGORIES,Receipt,Item,Filters,Answer} from './types'
+import { parseSpokenHindiAudio } from './hindiSpeechParser'
 
 // Reusable SVG Icons for clear, simple visual guidance
 function StoreIcon({className="w-5 h-5"}:{className?:string}){
@@ -50,6 +51,12 @@ function MenuIcon({className="w-5 h-5"}:{className?:string}){
 }
 function ChevronDownIcon({className="w-4 h-4"}:{className?:string}){
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+}
+function MicrophoneIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+}
+function CameraIcon({className="w-5 h-5"}:{className?:string}){
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
 }
 
 // Design system tokens matching the warm cream & emerald green theme with crisp, sharp edges
@@ -175,13 +182,19 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
                   <span className={`px-2 py-0.5 rounded-xs text-xs font-medium border ${catColors[r.category] || catColors.other}`}>
                     {t('cat.' + r.category)}
                   </span>
+                  {r.data && (
+                    <span className="px-2 py-0.5 rounded-xs text-xs font-medium bg-emerald-50 text-emerald-900 border border-emerald-300/80 flex items-center gap-1 max-w-[260px] truncate" title={r.data}>
+                      <span className="shrink-0 font-bold text-emerald-700">🎙️ {t('voice.dataTag')}:</span>
+                      <span className="truncate">{r.data.replace(/^Spoken:\s*/i, '')}</span>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
             <div className="text-right flex items-center gap-3 ml-auto">
               <div>
-                <b className={`block text-lg sm:text-xl font-bold ${r.type === 'expense' ? 'text-rose-600' : 'text-emerald-700'}`}>
-                  {r.total == null ? '—' : `${r.type === 'expense' ? '-' : '+'} ${money(r.total, lang, r.currency)}`}
+                <b className={`block text-lg sm:text-xl font-bold ${r.type === 'income' ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  {r.total == null ? '—' : `${r.type === 'income' ? '+' : '-'} ${money(r.total, lang, r.currency)}`}
                 </b>
                 <div className="mt-0.5">
                   <Badge s={r.status} />
@@ -912,7 +925,550 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
   )
 }
 
-function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () => void; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
+function VoiceAssistantModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: (r: Receipt) => void
+}) {
+  const { t, lang } = useI18n()
+  const [speechLang, setSpeechLang] = useState<'hi-IN' | 'en-IN'>(lang === 'en' ? 'en-IN' : 'hi-IN')
+  const [listening, setListening] = useState(false)
+  const [transcript, setTranscript] = useState('')
+  const [calculatedAmount, setCalculatedAmount] = useState<number | null>(null)
+  const [breakdown, setBreakdown] = useState<string>('')
+  const [vendorName, setVendorName] = useState('दुकान आवक')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(true)
+  const activeRecRef = useRef<any>(null)
+  const isListeningDesiredRef = useRef(false)
+  const restartTimerRef = useRef<any>(null)
+  const retryCountRef = useRef(0)
+
+  // Sync default vendor label when language switches
+  useEffect(() => {
+    if (vendorName === 'दुकान आवक' || vendorName === 'Money Added' || !vendorName) {
+      setVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
+    }
+  }, [speechLang])
+
+  const processSpokenInput = useCallback((text: string) => {
+    setErrorMsg(null)
+    if (!text || !text.trim()) return
+
+    const defaultPayer = speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added'
+    const result = parseSpokenHindiAudio(text, defaultPayer)
+
+    if (result.total > 0) {
+      setCalculatedAmount(result.total)
+      setBreakdown(result.breakdown)
+    }
+    if (result.payer && result.payer.trim().length > 1 && result.payer !== defaultPayer) {
+      setVendorName(result.payer.trim())
+    }
+  }, [speechLang])
+
+  // Clean tear-down helper: clears timers and detaches all event handlers before aborting
+  const stopSession = useCallback(() => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+      restartTimerRef.current = null
+    }
+    const current = activeRecRef.current
+    if (current) {
+      try {
+        current.onstart = null
+        current.onresult = null
+        current.onerror = null
+        current.onend = null
+        current.abort()
+      } catch {}
+      activeRecRef.current = null
+    }
+  }, [])
+
+  // Fresh session factory: ALWAYS instantiates a brand new SpeechRecognition object to avoid Chrome freeze
+  const startSession = useCallback(() => {
+    stopSession()
+
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRec) {
+      setSpeechSupported(false)
+      return
+    }
+
+    setSpeechSupported(true)
+    try {
+      const rec = new SpeechRec()
+      rec.continuous = true
+      rec.interimResults = true
+      rec.lang = speechLang
+      rec.maxAlternatives = 1
+
+      rec.onstart = () => {
+        setListening(true)
+        setErrorMsg(null)
+        retryCountRef.current = 0
+      }
+
+      rec.onresult = (event: any) => {
+        let finalTranscript = ''
+        let interimTranscript = ''
+        for (let i = 0; i < event.results.length; i++) {
+          const item = event.results[i]
+          if (item.isFinal) {
+            finalTranscript += item[0].transcript + ' '
+          } else {
+            interimTranscript += item[0].transcript
+          }
+        }
+        const combined = (finalTranscript + interimTranscript).trim()
+        if (combined) {
+          setTranscript(combined)
+          processSpokenInput(combined)
+        }
+      }
+
+      rec.onerror = (e: any) => {
+        // 'no-speech' happens on brief pause/silence; completely normal in continuous speech
+        if (e.error === 'no-speech' || e.error === 'aborted') {
+          return
+        }
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          isListeningDesiredRef.current = false
+          setListening(false)
+          setErrorMsg(
+            e.error === 'not-allowed'
+              ? 'माइक्रोफ़ोन अनुमति अस्वीकृत है। कृपया ब्राउज़र में माइक की अनुमति दें। (Microphone access denied)'
+              : 'भाषण पहचान सेवा अनुपलब्ध है। (Speech service unavailable)'
+          )
+          return
+        }
+        console.warn('Speech recognition event:', e.error)
+        retryCountRef.current += 1
+      }
+
+      rec.onend = () => {
+        // Self-healing: if the user still desires to listen, recreate a fresh instance after 150ms backoff
+        if (isListeningDesiredRef.current) {
+          if (restartTimerRef.current) clearTimeout(restartTimerRef.current)
+          restartTimerRef.current = setTimeout(() => {
+            if (isListeningDesiredRef.current) {
+              startSession()
+            }
+          }, 150)
+        } else {
+          setListening(false)
+        }
+      }
+
+      activeRecRef.current = rec
+      rec.start()
+    } catch (err: any) {
+      console.warn('Could not launch speech recognition:', err)
+      if (isListeningDesiredRef.current && retryCountRef.current < 4) {
+        retryCountRef.current += 1
+        restartTimerRef.current = setTimeout(() => {
+          if (isListeningDesiredRef.current) startSession()
+        }, 250)
+      } else {
+        setListening(false)
+      }
+    }
+  }, [speechLang, stopSession, processSpokenInput])
+
+  // Lifecycle hook for modal open/close & language change
+  useEffect(() => {
+    if (!isOpen) {
+      isListeningDesiredRef.current = false
+      stopSession()
+      setListening(false)
+      setTranscript('')
+      setCalculatedAmount(null)
+      setBreakdown('')
+      setErrorMsg(null)
+      return
+    }
+
+    // Auto-start listening on modal entry
+    isListeningDesiredRef.current = true
+    startSession()
+
+    return () => {
+      isListeningDesiredRef.current = false
+      stopSession()
+    }
+  }, [isOpen, speechLang, startSession, stopSession])
+
+  const handleToggleListening = () => {
+    if (listening) {
+      isListeningDesiredRef.current = false
+      stopSession()
+      setListening(false)
+    } else {
+      isListeningDesiredRef.current = true
+      startSession()
+    }
+  }
+
+  // Force clean reset of microphone session
+  const handleResetSession = () => {
+    isListeningDesiredRef.current = true
+    stopSession()
+    setErrorMsg(null)
+    startSession()
+  }
+
+  const handleClearTranscript = () => {
+    setTranscript('')
+    setCalculatedAmount(null)
+    setBreakdown('')
+  }
+
+  const handleSelectSample = (sampleText: string) => {
+    setTranscript(sampleText)
+    processSpokenInput(sampleText)
+  }
+
+  const handleSave = async () => {
+    if (submitting) return
+    if (!calculatedAmount || calculatedAmount <= 0) {
+      setErrorMsg(t('voice.noAmount'))
+      return
+    }
+
+    setSubmitting(true)
+    setErrorMsg(null)
+    try {
+      const payerFinal = vendorName.trim() || (speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
+      const res = await api.voiceQuickEntry({
+        spoken_text: transcript || `${payerFinal} ₹${calculatedAmount}`,
+        amount: calculatedAmount,
+        vendor: payerFinal,
+        category: 'other',
+        data: `Spoken: ${transcript || `${payerFinal} ₹${calculatedAmount}`} | Payer: ${payerFinal} | Breakdown: ${breakdown || `₹${calculatedAmount}`} (Total: ₹${calculatedAmount.toFixed(2)})`
+      })
+      onSuccess(res)
+      onClose()
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to add money via audio.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  const samples = [
+    { label: 'ताऊ 500 जोड़ ले (हरियाणवी)', text: 'ताऊ के 500 रुपै जोड़ ले' },
+    { label: 'च्यार सै रुपै (हरियाणवी)', text: 'च्यार सै रुपै' },
+    { label: 'डेढ सै + 20 (देसी जोड़)', text: 'डेढ सै चाय अर बीस बिस्कुट' },
+    { label: 'चौधरी साहब 1200', text: 'चौधरी साहब के 1200 आग्ये' },
+    { label: 'दू सौ पचास (भोजपुरी)', text: 'दू सौ पचास रुपया' },
+    { label: 'मास्टर जी 750 नकद', text: 'मास्टर जी 750 नकद' },
+  ]
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
+      onClick={e => { if (e.target === e.currentTarget && !submitting) onClose() }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl border border-stone-200 w-full max-w-lg overflow-hidden relative"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 bg-emerald-950 text-white">
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-xl bg-emerald-800 text-emerald-200 flex items-center justify-center">
+              <MicrophoneIcon className="w-4 h-4" />
+            </span>
+            <div>
+              <h3 className="font-bold text-base sm:text-lg leading-tight">
+                {t('voice.title')}
+              </h3>
+              <p className="text-[11px] text-emerald-300">
+                {speechLang === 'hi-IN' ? 'हिन्दी, हरियाणवी व देसी लहजे (Hindi & Haryanvi Accents)' : 'English Voice Assistant'}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Language Toggle Pill */}
+            <div className="flex items-center bg-emerald-900/90 p-0.5 rounded-lg border border-emerald-700/60 text-xs">
+              <button
+                type="button"
+                onClick={() => setSpeechLang('hi-IN')}
+                className={`px-2 py-1 rounded font-bold transition-all cursor-pointer ${
+                  speechLang === 'hi-IN'
+                    ? 'bg-emerald-500 text-emerald-950 shadow-xs'
+                    : 'text-emerald-200 hover:text-white'
+                }`}
+                title="Switch to Hindi Speech"
+              >
+                🇮🇳 हिन्दी
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpeechLang('en-IN')}
+                className={`px-2 py-1 rounded font-bold transition-all cursor-pointer ${
+                  speechLang === 'en-IN'
+                    ? 'bg-emerald-500 text-emerald-950 shadow-xs'
+                    : 'text-emerald-200 hover:text-white'
+                }`}
+                title="Switch to English Speech"
+              >
+                English
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="w-8 h-8 rounded-lg bg-emerald-900/70 hover:bg-emerald-800 text-emerald-200 flex items-center justify-center transition-colors cursor-pointer"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              <XIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 sm:p-6 space-y-4 text-center">
+          {!speechSupported ? (
+            <div className="py-6 text-stone-600">
+              <p className="text-sm font-semibold text-rose-700 mb-2">⚠ {t('voice.unsupported')}</p>
+              <p className="text-xs text-stone-500">Please use Google Chrome, Edge, or a browser with Web Speech recognition enabled.</p>
+            </div>
+          ) : (
+            <>
+              {/* Animated Microphone Pulse & Sound Waves */}
+              <div className="flex flex-col items-center justify-center pt-1 pb-2">
+                <button
+                  type="button"
+                  onClick={handleToggleListening}
+                  className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-lg ${
+                    listening
+                      ? 'bg-rose-600 text-white ring-8 ring-rose-100 scale-105'
+                      : 'bg-emerald-700 hover:bg-emerald-800 text-white ring-4 ring-emerald-100'
+                  }`}
+                  title={listening ? t('voice.stop') : t('voice.start')}
+                >
+                  <MicrophoneIcon className="w-9 h-9" />
+                  {listening && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-white animate-ping" />
+                  )}
+                </button>
+
+                {/* Animated Audio Equalizer Waveform */}
+                {listening ? (
+                  <div className="flex items-center justify-center gap-1.5 h-5 mt-2">
+                    <span className="w-1 bg-rose-500 rounded-full animate-pulse h-2.5" />
+                    <span className="w-1 bg-rose-600 rounded-full animate-bounce h-4.5" />
+                    <span className="w-1 bg-rose-500 rounded-full animate-pulse h-3" />
+                    <span className="w-1 bg-rose-700 rounded-full animate-bounce h-5" />
+                    <span className="w-1 bg-rose-600 rounded-full animate-pulse h-3.5" />
+                    <span className="w-1 bg-rose-500 rounded-full animate-bounce h-2" />
+                  </div>
+                ) : (
+                  <div className="h-5 mt-2" />
+                )}
+
+                <p className="mt-1 text-xs font-bold uppercase tracking-wider text-stone-600">
+                  {listening ? t('voice.listening') : t('voice.prompt')}
+                </p>
+
+                {/* Quick Mic Health Reset */}
+                <button
+                  type="button"
+                  onClick={handleResetSession}
+                  className="mt-1 text-[11px] text-stone-400 hover:text-emerald-700 transition-colors inline-flex items-center gap-1 cursor-pointer font-medium"
+                  title="Click if microphone stops responding"
+                >
+                  <span>🔄</span>
+                  <span>माइक रीसेट करें (Reset Mic)</span>
+                </button>
+              </div>
+
+              {/* Regional Tone & Dialects Badge */}
+              {speechLang === 'hi-IN' && (
+                <div className="text-left bg-emerald-50/70 rounded-xl p-2.5 border border-emerald-200/70 text-emerald-950">
+                  <div className="flex items-center gap-1.5 font-bold text-[11px] text-emerald-900 mb-0.5">
+                    <span>🎙️</span>
+                    <span>{t('voice.dialectsBadge')}</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-snug">
+                    {t('voice.dialectsDesc')}
+                  </p>
+                </div>
+              )}
+
+              {/* Quick Dialect Example Chips */}
+              <div className="text-left bg-stone-50/80 rounded-xl p-2.5 border border-stone-200/80">
+                <p className="text-[11px] font-semibold text-stone-500 mb-1.5 flex items-center gap-1">
+                  <span>💡</span>
+                  <span>{t('voice.sampleChipsLabel')}</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {samples.map((s, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSelectSample(s.text)}
+                      className="px-2.5 py-1 text-xs font-medium rounded-lg bg-white border border-stone-200 hover:border-emerald-500 hover:bg-emerald-50 text-stone-700 hover:text-emerald-800 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Spoken Transcript Box (with manual edit & clear capability) */}
+              <div className="rounded-2xl bg-stone-50 border border-stone-200/90 p-3.5 text-left">
+                <div className="flex items-center justify-between text-xs text-stone-500 font-semibold mb-1">
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>{t('voice.dataTag')}</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {listening && <span className="text-rose-600 font-bold animate-pulse text-[11px]">● Live Recording</span>}
+                    {transcript && (
+                      <button
+                        type="button"
+                        onClick={handleClearTranscript}
+                        className="text-[11px] text-stone-400 hover:text-stone-700 font-medium underline cursor-pointer"
+                      >
+                        साफ़ करें (Clear)
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={transcript}
+                  onChange={e => {
+                    setTranscript(e.target.value)
+                    processSpokenInput(e.target.value)
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && calculatedAmount && calculatedAmount > 0 && !submitting) {
+                      e.preventDefault()
+                      handleSave()
+                    }
+                  }}
+                  placeholder={speechLang === 'hi-IN' ? '"ताऊ के 500 जोड़ ले" या "च्यार सै रुपै" या "डेढ सै चाय अर बीस बिस्कुट"' : '"Tea 40 rupees" or "50 notebooks + 20 pens"'}
+                  className="w-full bg-transparent border-0 p-0 text-stone-900 font-semibold text-base focus:ring-0 focus:outline-hidden placeholder:text-stone-400 placeholder:font-normal placeholder:italic"
+                />
+              </div>
+
+              {/* Calculated Amount & Vendor Preview */}
+              {calculatedAmount !== null && (
+                <div className="rounded-2xl bg-emerald-50/90 border border-emerald-300 p-4 text-left space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">
+                        {t('voice.calcTag')}
+                      </span>
+                      {breakdown && (
+                        <p className="text-xs font-medium text-emerald-700 mt-0.5">
+                          {breakdown}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-3xl font-black text-emerald-700 tracking-tight">
+                        + ₹{calculatedAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Editable Details: Payer & Amount */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60">
+                    <div>
+                      <label className="block text-[10px] font-bold text-emerald-900 uppercase">
+                        {t('voice.payerLabel')}
+                      </label>
+                      <input
+                        type="text"
+                        value={vendorName}
+                        onChange={e => setVendorName(e.target.value)}
+                        className="mt-0.5 w-full text-xs font-semibold px-2.5 py-1.5 bg-white rounded-lg border border-emerald-300 focus:outline-emerald-600 text-stone-800"
+                        placeholder="दुकान आवक"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-emerald-900 uppercase">
+                        {t('voice.amountLabel')}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={calculatedAmount ?? ''}
+                        onChange={e => setCalculatedAmount(parseFloat(e.target.value) || 0)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && calculatedAmount && calculatedAmount > 0 && !submitting) {
+                            e.preventDefault()
+                            handleSave()
+                          }
+                        }}
+                        className="mt-0.5 w-full text-xs font-bold px-2.5 py-1.5 bg-white rounded-lg border border-emerald-300 focus:outline-emerald-600 text-emerald-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Error message */}
+              {errorMsg && (
+                <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800 text-left">
+                  {errorMsg}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 font-bold text-sm cursor-pointer transition-colors"
+                  disabled={submitting}
+                >
+                  {t('rv.cancelFinishLater')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={submitting || !calculatedAmount || calculatedAmount <= 0}
+                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <span>{t('rv.saving')}</span>
+                  ) : (
+                    <>
+                      <PlusIcon className="w-4 h-4 stroke-[3]" />
+                      <span>{t('voice.stop')}</span>
+                      {calculatedAmount && calculatedAmount > 0 && (
+                        <span className="font-extrabold">(+₹{calculatedAmount})</span>
+                      )}
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Home({ onAddReceipt, onOpenVoice, onSelectReceipt, refreshKey }: { onAddReceipt: () => void; onOpenVoice: () => void; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
   const { t, lang,currency } = useI18n()
   const q = useLoad(() => Promise.all([
     api.summary(),
@@ -926,7 +1482,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
     <State {...q}>
       {s && c && p && (
         <div className="space-y-8">
-          {/* Welcoming Dashboard Greeting & Prominent Action Button */}
+          {/* Welcoming Dashboard Greeting & Action Buttons */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-emerald-800 font-semibold text-sm mb-1">
@@ -938,10 +1494,23 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                 {day(new Date().toISOString(), lang)}
               </p>
             </div>
-            <div>
-              <button onClick={onAddReceipt} className={prominentBtn}>
-                <PlusIcon className="w-5 h-5" />
-                <span>{t('home.add')}</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={onAddReceipt}
+                className={`${prominentBtn} bg-emerald-700 hover:bg-emerald-800 text-white`}
+              >
+                <CameraIcon className="w-5 h-5" />
+                <span>{t('home.addPicture')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={onOpenVoice}
+                className="min-h-[46px] px-5 sm:px-6 rounded-xs border-2 border-emerald-600/60 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-bold text-base sm:text-lg shadow-2xs hover:border-emerald-700 transition-all cursor-pointer inline-flex items-center gap-2.5 py-3.5"
+                title={t('voice.btn')}
+              >
+                <MicrophoneIcon className="w-5 h-5 text-emerald-700 animate-pulse" />
+                <span>{t('voice.btn')}</span>
               </button>
             </div>
           </div>
@@ -950,11 +1519,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
           {s.confirmedCount === 0 && (
             <div className={`${card} border-emerald-200 bg-emerald-50/40 p-6 sm:p-8 text-center max-w-xl mx-auto`}>
               <ReceiptIcon className="w-12 h-12 mx-auto text-emerald-700 mb-3" />
-              <p className="mb-4 text-lg font-medium text-stone-800">{t('home.empty')}</p>
-              <button onClick={onAddReceipt} className={primary}>
-                <PlusIcon className="w-5 h-5" />
-                {t('home.add')}
-              </button>
+              <p className="text-lg font-medium text-stone-800">{t('home.empty')}</p>
             </div>
           )}
 
@@ -1034,10 +1599,10 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
               </div>
               {s.reviewCount > 0 ? (
                 <a href="#waiting-section" className="text-xs font-medium text-amber-800 mt-4 block underline">
-                  {t('home.reviewNow')} ↓
+                  {t('home.reviewNow')} ({s.reviewCount}) ↓
                 </a>
               ) : (
-                <span className="text-xs text-stone-500 mt-4 block">{t('home.none')}</span>
+                <span className="text-xs font-semibold text-emerald-700 mt-4 block">✓ {t('home.none')}</span>
               )}
             </div>
           </div>
@@ -1057,9 +1622,16 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
             {p.length ? (
               <RList rs={p} onSelect={onSelectReceipt} />
             ) : (
-              <div className={`${card} text-center py-8 text-stone-700 bg-emerald-50/30 border border-dashed border-emerald-200`}>
-                <CheckCircleIcon className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-                <p className="text-base sm:text-lg font-bold text-emerald-900">{t('home.none')}</p>
+              <div className={`${card} text-center py-10 text-stone-700 bg-emerald-50/40 border border-dashed border-emerald-300 rounded-2xl`}>
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                  <CheckCircleIcon className="w-7 h-7" />
+                </div>
+                <p className="text-2xl sm:text-3xl font-extrabold text-emerald-950 tracking-tight">
+                  {t('home.none')}
+                </p>
+                <p className="text-sm text-stone-600 mt-1.5 font-medium">
+                  {t('home.noneSub')}
+                </p>
               </div>
             )}
           </section>
@@ -1152,14 +1724,16 @@ function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
         <p className="text-stone-600 text-sm mb-4">
           Click or drop bill photos, scanned copies, or PDF invoices
         </p>
-        <button
-          type="button"
-          className={prominentBtn}
-          onClick={e => { e.stopPropagation(); inputRef.current?.click() }}
-        >
-          <PlusIcon className="w-5 h-5" />
-          <span>{t('up.choose')}</span>
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            className={`${prominentBtn} bg-emerald-700 hover:bg-emerald-800 text-white`}
+            onClick={e => { e.stopPropagation(); inputRef.current?.click() }}
+          >
+            <CameraIcon className="w-5 h-5" />
+            <span>{t('up.choosePicture')}</span>
+          </button>
+        </div>
         <input
           ref={inputRef}
           type="file"
@@ -1421,6 +1995,7 @@ export default function App(){
 
   // Modal & Notification State
   const [activeModal, setActiveModal] = useState<{ id?: string; file?: File } | null>(null)
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -1498,7 +2073,7 @@ export default function App(){
 
   const nav = [
     { p: '/', k: 'nav.home', icon: StoreIcon },
-    { p: '/upload', k: 'nav.upload', icon: PlusIcon },
+    { p: '/upload', k: 'nav.upload', icon: CameraIcon },
     { p: '/ledger', k: 'nav.ledger', icon: ReceiptIcon },
     { p: '/ask', k: 'nav.ask', icon: SparklesIcon },
     { p: '/settings', k: 'nav.settings', icon: SettingsIcon }
@@ -1555,6 +2130,17 @@ export default function App(){
         />
       )}
 
+      {/* Voice Assistant Modal Popup */}
+      <VoiceAssistantModal
+        isOpen={voiceModalOpen}
+        onClose={() => setVoiceModalOpen(false)}
+        onSuccess={(r) => {
+          setRefreshKey(prev => prev + 1)
+          setToastMessage(t('voice.success', { amount: money(r.total || 0, lang, r.currency) }))
+          setTimeout(() => setToastMessage(null), 5000)
+        }}
+      />
+
       {/* Top Header Bar - Only Logo is visible, with a dropdown menu trigger */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-2xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:py-3.5">
@@ -1573,24 +2159,26 @@ export default function App(){
             </div>
           </a>
 
-          {/* Header Dropdown Toggle Trigger Button */}
-          <button
-            type="button"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-expanded={menuOpen}
-            aria-label={t('nav.label')}
-            className="flex items-center gap-2 px-3 py-2 rounded-xs border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 font-semibold text-sm shadow-2xs cursor-pointer transition-colors"
-          >
-            {menuOpen ? (
-              <XIcon className="w-5 h-5 text-stone-700" />
-            ) : (
-              <MenuIcon className="w-5 h-5 text-stone-700" />
-            )}
-            <ChevronDownIcon className={`w-4 h-4 text-stone-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
-          </button>
+          {/* Menu Trigger */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-expanded={menuOpen}
+              aria-label={t('nav.label')}
+              className="flex items-center gap-2 px-3 py-2 rounded-xs border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 font-semibold text-sm shadow-2xs cursor-pointer transition-colors"
+            >
+              {menuOpen ? (
+                <XIcon className="w-5 h-5 text-stone-700" />
+              ) : (
+                <MenuIcon className="w-5 h-5 text-stone-700" />
+              )}
+              <ChevronDownIcon className={`w-4 h-4 text-stone-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
         </div>
 
-        {/* Dropdown Navigation & Quick Actions Menu */}
+        {/* Dropdown Navigation Menu */}
         {menuOpen && (
           <div className="border-t border-stone-200 bg-white shadow-md animate-in slide-in-from-top-1 duration-150">
             <div className="mx-auto max-w-5xl px-4 py-3 space-y-3">
@@ -1617,19 +2205,7 @@ export default function App(){
                 })}
               </nav>
 
-              <div className="pt-2 border-t border-stone-200/80 flex flex-wrap items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    hiddenFileInputRef.current?.click()
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xs bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  <span>{t('home.add')}</span>
-                </button>
-
+              <div className="pt-2 border-t border-stone-200/80 flex items-center justify-end">
                 <button
                   className="min-h-[38px] px-3.5 rounded-xs border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
                   aria-label={t('lang.label')}
@@ -1665,6 +2241,7 @@ export default function App(){
         ) : (
           <Home
             onAddReceipt={() => hiddenFileInputRef.current?.click()}
+            onOpenVoice={() => setVoiceModalOpen(true)}
             onSelectReceipt={r => setActiveModal({ id: r.id })}
             refreshKey={refreshKey}
           />

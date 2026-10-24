@@ -19,8 +19,9 @@ This task list tracks the execution of each authorized step for **ShopLedger**. 
   - **Step 9 — Formula-Injection Safe CSV Export** [x]
   - **Step 10 — Bilingual Interface, Accessibility & Polish** [x]
   - **Step 11 — Demo Readiness & Test Dataset** [x]
-- **Current Authorized Step**: **All Steps Completed (Steps 0 through 11 Fully Verified)**
-- **Overall Progress**: 12 / 12 Steps Completed (100% Complete)
+  - **Step 12 — Voice Assistant Quick-Log (< ₹1,000) & Data Column** [ ]
+- **Current Authorized Step**: **Step 12 — Voice Assistant Quick-Log (< ₹1,000) & Data Column (Awaiting Approval)**
+- **Overall Progress**: 12 / 13 Steps Completed (92% Complete)
 
 ---
 
@@ -196,4 +197,50 @@ This task list tracks the execution of each authorized step for **ShopLedger**. 
 - [x] Finalize `README.md` with complete local run, testing commands, and 3-minute hackathon demo script.
 - [x] Add automated test suite for dataset and fixture verification (`tests/test_dataset_fixtures.py` - 3/3 passed).
 - [x] Full test suite passing across all 10 test modules (40/40 passed).
-- [x] All 12 build order steps (Steps 0 through 11) successfully delivered and verified!
+- [x] All 12 initial build order steps (Steps 0 through 11) successfully delivered and verified!
+
+---
+
+### Step 12: Voice Assistant Quick-Log (< ₹1,000) & Data Column (COMPLETED)
+- [x] Present Step 12 Scope, File Impact, API Contracts, Database Schema Updates, and UI States.
+- [x] Receive explicit approval ("add voice feature beside add receit picture") before implementing code.
+- [x] Backend database migration: add `data TEXT` and `type TEXT DEFAULT 'expense'` columns to `receipts` table in `backend/app/database.py`.
+- [x] Implement `POST /api/receipts/voice-quick-entry` in `backend/app/routers/receipts.py` and `backend/app/services/receipt_service.py`:
+  - Logs as `type = 'income'` (money added, rendered in bold green with `+` sign).
+  - Generate voucher record and SVG file placeholder in `backend/data/uploads` (`VOICE MONEY ADDED VOUCHER` with `+ INR ...`).
+  - Store spoken text / calculations in `receipts.data`.
+  - Save as `status = 'confirmed'`, insert line items and `VOICE_QUICK_ENTRY` event log.
+- [x] Update `Receipt` type in `src/types.ts` and serialization in `receipt_service.py` to include `data` and `type: 'income'`.
+- [x] Implement browser Web Speech API voice assistant (`SpeechRecognition`) in frontend:
+  - Clean button showing Microphone icon with "Add audio" (`voice.addAudio`) positioned beside "Add Receipt Picture" button.
+  - Removed `< 1000` limit and `entry<1000` button text; allows adding any audio amounts.
+  - Live preview and transaction row always display as money added with bold green font and `+` sign (`+ ₹...`).
+  - Bilingual recognition: Hindi (`hi-IN`) and English (`en-IN`).
+  - Spoken number and amount parsing (e.g., "Chai 40", "Cash 500").
+  - Instant ledger logging and toast notification.
+- [x] Display `data` column/pill on the Transactions / Ledger view in `src/App.tsx`.
+- [x] Add bilingual translation strings in `src/locales/en.json` and `src/locales/hi.json`.
+- [x] Automated pytest tests verifying `type: 'income'`, green `+` sign voucher, and `data` column persistence (`backend/tests/test_voice_entry.py` - 3/3 passed).
+- [x] Verify clean build (`npm run build`) and test suite (48/48 passed).
+- [x] Step 12 successfully delivered and verified!
+
+---
+
+### Step 13: Enhanced Hindi & Haryanvi Audio Engine & Dialect Accent Parser (COMPLETED)
+- [x] Implement comprehensive Hindi & Haryanvi accent and dialect recognition in `src/hindiSpeechParser.ts`:
+  - Devanagari digit converter (`०, १, २, ३, ४, ५, ६, ७, ८, ९` -> `0-9`).
+  - Haryanvi hundred multiplier normalization: automatically converts Haryanvi `सै` / `sai` when following numbers or fractions into `सौ` (e.g. `च्यार सै` -> 400, `दो सै` -> 200, `डेढ सै` -> 150, `ढाई सै` -> 250, `साढ़े तीन सै` -> 350).
+  - Multi-dialect colloquial fractions: handles Haryanvi & rural spellings (`डेढ`, `डैढ`, `ढाई`, `साढे`, `साढै`, `सवाय`, `पौणे`, `पोने`).
+  - Haryanvi & regional numerals: `दू`, `दोय` (2), `तीन्या` (3), `च्यार`, `चयार`, `chyaar` (4), `पंज` (5), `छे`, `छी`, `chhe` (6), `नू` (9), `दहे` (10), `ग्यारा` (11), `बारा` (12), `तेरा` (13), `चौदा` (14), `पंदरा` (15), `सोला` (16), `सतरा` (17), `अठारा` (18), `उगणीस`, `उगनीस`, `गुणीस`, `गुनीस` (19), `चाली` (40), `पचासे` (50), `हज्यार` (1000).
+  - Regional additive conjunctions: splits and sums items connected by `अर`, `अरु`, `गैल`, `और`, `and`, `plus`, `+`, `तथा`, `जमा` (e.g. `डेढ सै चाय अर बीस बिस्कुट` -> 170).
+  - Dialect transaction verbs & postpositions stripped from payer names: `रुपै`, `रूपै`, `रिपिए`, `रपिए`, `रुपिया`, `टका`, `आग्ये`, `आगे`, `आग्या`, `देग्या`, `देगे`, `देलक`, `मिलल`, `पागे`, `जोड़ ले`, `लिख ले`, `चढ़ा ले`, `धर दे`, `खाते म्ह`, `गल्ले म्ह`, `सूं`, `पै`, `पे`, `रोकड़`, `रोकड़ा`.
+  - Preserves titles and customer names accurately: `ताऊ`, `ताऊ रामफल`, `चौधरी साहब`, `मास्टर जी`, `काका`, `लाला जी`, `पंडित जी`, `सरपंच`.
+- [x] Upgrade `VoiceAssistantModal` in `src/App.tsx`:
+  - Modal subtitle: `हिन्दी, हरियाणवी व देसी लहजे (Hindi & Haryanvi Accents)`.
+  - Dialect helper card with visual indicator (`🎙️ हिन्दी, हरियाणवी व सभी देसी लहजे समर्थित हैं`).
+  - Clickable dialect chips: `ताऊ 500 जोड़ ले (हरियाणवी)`, `च्यार सै रुपै (हरियाणवी)`, `डेढ सै + 20 (देसी जोड़)`, `चौधरी साहब 1200 आग्ये`, `दू सौ पचास (भोजपुरी)`, `मास्टर जी 750 नकद`.
+  - Prominent bold green added money display (`+ ₹{amount}`) with breakdown indicator.
+  - Editable payer/source and amount inputs.
+- [x] Synchronize bilingual localization in `src/locales/en.json` and `src/locales/hi.json`.
+- [x] Verified full compilation (`npx tsc --noEmit && npm run build`) and backend tests (48/48 passed).
+

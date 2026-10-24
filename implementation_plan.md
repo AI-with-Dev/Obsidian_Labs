@@ -326,6 +326,50 @@ We will curate 20 synthetic receipt fixtures covering all edge cases, paired wit
 
 ---
 
+## Step 12: Voice Assistant Quick-Log (< ₹1,000) & Data Column
+
+### 1. Objective & Financial Rule
+- Enable the stationery shop owner to log quick small expenses under ₹1,000 (e.g., petty cash, snacks, pens, packing tape, auto fare) via voice dictation with zero paper receipts.
+- **Strict Financial Guard**: Only expenses strictly **below ₹1,000.00** (`total_paise < 100000`) are accepted by the quick voice logger. Amounts $\ge$ ₹1,000 require the standard receipt upload and verification flow.
+
+### 2. Database Schema Migration
+- In `receipts` table, add a new column: `data TEXT`.
+- Idempotent migration in `backend/app/database.py`:
+  ```sql
+  ALTER TABLE receipts ADD COLUMN data TEXT;
+  ```
+- The `data` column stores the original spoken voice transcript, calculation breakdown, or quick metadata.
+
+### 3. Backend API Contract
+- `POST /api/receipts/voice-quick-entry`:
+  - Request body:
+    ```json
+    {
+      "spoken_text": "Chai aur biscuits 60 rupees",
+      "amount": 60.0,
+      "vendor": "Tea & Snacks",
+      "category": "utilities",
+      "data": "Spoken: Chai aur biscuits 60 rupees"
+    }
+    ```
+  - Validation:
+    - Enforce `amount > 0` and `amount < 1000.0` (returns `400 Bad Request` if $\ge 1000$).
+    - Generate an SVG placeholder voucher file in `backend/data/uploads/` so `GET /api/receipts/{id}/file` works seamlessly.
+    - Set `status = 'confirmed'`, `confirmed_at = CURRENT_TIMESTAMP`, `total_paise = int(amount * 100)`.
+    - Create line item in `receipt_items` and audit event `VOICE_QUICK_ENTRY` in `receipt_events`.
+    - Returns full receipt object including `data` field.
+
+### 4. Frontend Voice Assistant & UI
+- Browser-native Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`) supporting English (`en-IN`) and Hindi (`hi-IN`).
+- Microphone button in Header / Home view with pulse animation while recording.
+- Calculation & extraction engine:
+  - Parses single amounts ("₹60", "80 rupaye", "tea 40") or simple sums ("50 aur 30" -> 80).
+  - Validates total is under ₹1,000.
+  - Automatically logs the confirmed expense and refreshes dashboard & ledger.
+- Displays the `data` column/pill on the Transactions / Ledger view.
+
+---
+
 ## Build Order & Step Breakdown
 
 | Step | Title | Scope & Deliverables | Approval Gate Status |
@@ -342,6 +386,7 @@ We will curate 20 synthetic receipt fixtures covering all edge cases, paired wit
 | **Step 9** | **CSV Export** | Server-side CSV streaming of confirmed expenses with formula injection protection and download integration. | **COMPLETED** |
 | **Step 10** | **Hindi UI, Accessibility & Polish** | Full bilingual verification (English & Hindi), persistent language switch, mobile tap targets, contrast, double-submit prevention. | **COMPLETED** |
 | **Step 11** | **Demo Readiness & Verification** | Clean seed data, end-to-end user journey walkthrough, test suite execution, deployment/run instructions in README. | **COMPLETED** |
+| **Step 12** | **Voice Assistant & Data Column** | Web Speech API voice assistant for quick expenses (< ₹1,000), calculation engine, SQLite schema migration adding `data TEXT` column, instant confirmed ledger logging, and transaction UI data display. | **PROPOSED (Pending Approval)** |
 
 ---
 

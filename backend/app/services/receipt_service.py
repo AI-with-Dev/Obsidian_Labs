@@ -10,7 +10,7 @@ from fastapi import HTTPException, UploadFile, status
 
 from backend.app.config import settings
 from backend.app.database import get_db
-from backend.app.models import ReceiptUpdatePayload
+from backend.app.models import ReceiptUpdatePayload, VoiceQuickEntryPayload
 
 ALLOWED_MIMES = {
     "image/jpeg": ".jpg",
@@ -209,7 +209,7 @@ def get_receipt_details(receipt_id: str) -> dict:
             """
             SELECT id, file_path, file_name, vendor, receipt_date, currency,
                    total_paise, category, status, flags_json, duplicate_of_receipt_id,
-                   invoice_number, tax_paise, discount_paise, payment_method, notes
+                   invoice_number, tax_paise, discount_paise, payment_method, notes, data
             FROM receipts
             WHERE id = ?;
             """,
@@ -260,6 +260,9 @@ def get_receipt_details(receipt_id: str) -> dict:
         tax_val = (row["tax_paise"] / 100.0) if row["tax_paise"] is not None else None
         discount_val = (row["discount_paise"] / 100.0) if row["discount_paise"] is not None else None
 
+        row_keys = row.keys() if hasattr(row, "keys") else []
+        tx_type = row["type"] if ("type" in row_keys and row["type"]) else ("income" if str(row["id"]).startswith("rec_voice_") else "expense")
+
         return {
             "id": row["id"],
             "vendor": row["vendor"] or "",
@@ -269,6 +272,8 @@ def get_receipt_details(receipt_id: str) -> dict:
             "total": total_val,
             "category": row["category"] or "other",
             "status": frontend_status,
+            "type": tx_type,
+            "data": row["data"] or "",
             "fileUrl": f"/api/receipts/{row['id']}/file",
             "fileName": row["file_name"],
             "flags": flags,
@@ -421,13 +426,13 @@ def list_receipts(
     status_filter: Optional[str] = None,
 ) -> list:
     """List receipts matching search and filter parameters."""
-    query = "SELECT id FROM receipts WHERE status != 'discarded_duplicate'"
+    query = "SELECT id FROM receipts WHERE status != 'discarded_duplicate' AND status != 'extraction_failed'"
     params = []
 
     if status_filter == "confirmed":
         query += " AND status = 'confirmed'"
     elif status_filter == "pending":
-        query += " AND status != 'confirmed'"
+        query += " AND status NOT IN ('confirmed', 'discarded_duplicate', 'extraction_failed')"
 
     if category:
         query += " AND category = ?"
@@ -531,6 +536,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
         invoice_number = payload.invoiceNumber.strip() if payload.invoiceNumber is not None else None
         payment_method = payload.paymentMethod.strip() if payload.paymentMethod is not None else None
         notes = payload.notes.strip() if payload.notes is not None else None
+        data_val = payload.data.strip() if payload.data is not None else None
 
         tax_paise = None
         if payload.tax is not None:
@@ -560,6 +566,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 discount_paise = COALESCE(?, discount_paise),
                 payment_method = COALESCE(?, payment_method),
                 notes = COALESCE(?, notes),
+                data = COALESCE(?, data),
                 flags_json = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?;
@@ -575,6 +582,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 discount_paise,
                 payment_method,
                 notes,
+                data_val,
                 json.dumps(list(existing_flags)),
                 receipt_id,
             ),
@@ -757,3 +765,86 @@ def keep_separate(receipt_id: str) -> dict:
         )
 
     return get_receipt_details(receipt_id)
+
+
+def create_voice_quick_entry(payload: VoiceQuickEntryPayload) -> dict:
+    """Create a confirmed income entry from voice audio input."""
+    if payload.amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Amount must be greater than 0.",
+        )
+
+    amount_paise = int(round(Decimal(str(payload.amount)) * 100))
+    receipt_id = f"rec_voice_{uuid.uuid4().hex[:12]}"
+    vendor_name = (payload.vendor or "").strip() or "Voice Added Money"
+    spoken_data = (payload.data or f"Spoken: {payload.spoken_text}").strip()
+    category = payload.category if payload.category in ALLOWED_CONFIRM_CATEGORIES else "other"
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Generate an SVG voucher file for disk retrieval
+    voucher_filename = f"{receipt_id}_voice_voucher.svg"
+    voucher_path = settings.upload_dir_resolved / voucher_filename
+    svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+  <rect width="400" height="400" fill="#FFFDF8" stroke="#059669" stroke-width="3" rx="12"/>
+  <rect x="0" y="0" width="400" height="60" fill="#064E3B"/>
+  <text x="200" y="38" font-size="18" font-family="sans-serif" font-weight="bold" fill="#ECFDF5" text-anchor="middle">VOICE MONEY ADDED VOUCHER</text>
+  <text x="30" y="110" font-size="16" font-family="sans-serif" fill="#6B7280">Payer / Source:</text>
+  <text x="30" y="135" font-size="20" font-family="sans-serif" font-weight="bold" fill="#111827">{vendor_name}</text>
+  <text x="30" y="180" font-size="16" font-family="sans-serif" fill="#6B7280">Date: {today_str}</text>
+  <text x="30" y="210" font-size="16" font-family="sans-serif" fill="#6B7280">Voice Audio Data:</text>
+  <text x="30" y="235" font-size="14" font-family="sans-serif" fill="#064E3B" font-style="italic">{payload.spoken_text[:40]}</text>
+  <line x1="30" y1="260" x2="370" y2="260" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="30" y="300" font-size="16" font-family="sans-serif" fill="#6B7280">Total Added:</text>
+  <text x="30" y="340" font-size="32" font-family="sans-serif" font-weight="extrabold" fill="#059669">+ INR {payload.amount:.2f}</text>
+</svg>"""
+    voucher_path.write_text(svg_content, encoding="utf-8")
+    file_hash = hashlib.sha256(svg_content.encode("utf-8")).hexdigest()
+
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO receipts (
+                id, file_path, file_name, file_hash, mime_type, vendor,
+                receipt_date, currency, total_paise, category, status,
+                flags_json, data, notes, type, confirmed_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'INR', ?, ?, 'confirmed', '[]', ?, ?, 'income', ?, ?);
+            """,
+            (
+                receipt_id,
+                str(voucher_path),
+                voucher_filename,
+                file_hash,
+                "image/svg+xml",
+                vendor_name,
+                today_str,
+                amount_paise,
+                category,
+                spoken_data,
+                f"Voice Quick Entry: {payload.spoken_text}",
+                now_ts,
+                now_ts,
+            ),
+        )
+
+        # Insert line item
+        conn.execute(
+            """
+            INSERT INTO receipt_items (receipt_id, item_order, description, quantity, line_total_paise, unit_price_paise)
+            VALUES (?, 1, ?, 1.0, ?, ?);
+            """,
+            (receipt_id, payload.spoken_text or "Voice added money item", amount_paise, amount_paise),
+        )
+
+        # Audit event
+        conn.execute(
+            """
+            INSERT INTO receipt_events (receipt_id, event_type, details_json)
+            VALUES (?, 'VOICE_QUICK_ENTRY', ?);
+            """,
+            (receipt_id, json.dumps({"spoken_text": payload.spoken_text, "amount": payload.amount, "data": spoken_data})),
+        )
+
+    return get_receipt_details(receipt_id)
+

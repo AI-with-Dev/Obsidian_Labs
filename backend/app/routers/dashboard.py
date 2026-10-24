@@ -27,7 +27,7 @@ async def get_dashboard_summary():
             """
             SELECT COUNT(*) AS review_count
             FROM receipts
-            WHERE status != 'confirmed' AND status != 'discarded_duplicate';
+            WHERE status NOT IN ('confirmed', 'discarded_duplicate', 'extraction_failed');
             """
         ).fetchone()
 

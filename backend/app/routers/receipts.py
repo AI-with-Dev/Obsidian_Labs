@@ -113,3 +113,15 @@ async def keep_separate_endpoint(id: str):
     """Keep receipt as a separate expense."""
     data = keep_separate(id)
     return ApiResponse.ok(data)
+
+
+from backend.app.models import VoiceQuickEntryPayload
+from backend.app.services.receipt_service import create_voice_quick_entry
+
+
+@router.post("/voice-quick-entry", response_model=ApiResponse[dict])
+def voice_quick_entry_endpoint(payload: VoiceQuickEntryPayload):
+    """Log an income/added money entry directly from voice dictation into the ledger and data column."""
+    data = create_voice_quick_entry(payload)
+    return ApiResponse.ok(data)
+
