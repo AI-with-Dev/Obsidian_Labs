@@ -2,6 +2,7 @@ import io
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
@@ -19,6 +20,7 @@ from fastapi import HTTPException
 from backend.app.services.gemini_service import (
     ExtractedLineItem,
     ReceiptExtractionResult,
+    extract_receipt_with_gemini,
     get_gemini_client,
 )
 
@@ -30,7 +32,7 @@ def test_gemini_client_reports_missing_environment_key(monkeypatch):
         get_gemini_client()
 
     assert "GEMINI_API_KEY" in exc_info.value.detail
-    assert "backend environment variables" in exc_info.value.detail
+    assert ".env file" in exc_info.value.detail
 
 
 def test_gemini_client_trims_environment_key(monkeypatch):
@@ -39,6 +41,34 @@ def test_gemini_client_trims_environment_key(monkeypatch):
         get_gemini_client()
 
     client.assert_called_once_with(api_key="test-gemini-key")
+
+
+def test_extraction_falls_back_from_configured_model_to_supported_flash_lite(
+    tmp_path, monkeypatch
+):
+    receipt_path = tmp_path / "receipt.jpg"
+    receipt_path.write_bytes(b"\xff\xd8\xfftest")
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(settings, "GEMINI_MODEL", "retired-model")
+    client = MagicMock()
+    client.models.generate_content.side_effect = [
+        RuntimeError("model not found"),
+        SimpleNamespace(text="{}"),
+    ]
+
+    with (
+        patch("backend.app.services.gemini_service.genai.Client", return_value=client),
+        patch("backend.app.services.gemini_service.time.sleep"),
+    ):
+        extraction, raw_json = extract_receipt_with_gemini(receipt_path, "image/jpeg")
+
+    assert raw_json == "{}"
+    assert extraction.vendor == ""
+    called_models = [
+        call.kwargs["model"]
+        for call in client.models.generate_content.call_args_list
+    ]
+    assert called_models == ["retired-model", "gemini-3.5-flash-lite"]
 
 
 @pytest.fixture(autouse=True)

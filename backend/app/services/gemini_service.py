@@ -99,8 +99,7 @@ def get_gemini_client() -> genai.Client:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                "Gemini is not configured. Set GEMINI_API_KEY in the backend "
-                "environment variables and redeploy."
+                "Gemini is not configured. Set GEMINI_API_KEY in the project's local .env file."
             ),
         )
     return genai.Client(api_key=api_key)
@@ -153,8 +152,8 @@ def extract_receipt_with_gemini(
         temperature=0.0,
     )
 
-    models_to_try = [settings.GEMINI_MODEL]
-    for alt in ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview"]:
+    models_to_try = [settings.GEMINI_MODEL.strip()]
+    for alt in ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.1-flash-lite"]:
         if alt not in models_to_try:
             models_to_try.append(alt)
 

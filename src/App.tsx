@@ -83,6 +83,16 @@ const h1 = 'text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 mb-1'
 const h2 = 'text-xl sm:text-2xl font-bold tracking-tight text-stone-900 mb-4'
 
 const OK = ['image/jpeg', 'image/png', 'application/pdf']
+const OK_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.pdf'])
+
+function isSupportedReceiptFile(file: File) {
+  const mimeType = file.type.toLowerCase()
+  const extension = file.name.match(/\.[^.]+$/)?.[0].toLowerCase()
+  return OK.includes(mimeType) || (
+    OK_EXTENSIONS.has(extension ?? '') &&
+    (!mimeType || mimeType === 'application/octet-stream' || mimeType === 'image/jpg')
+  )
+}
 
 function useHash(){
   const get = () => location.hash.slice(1) || '/'
@@ -1958,7 +1968,7 @@ function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
 
   const handleFile = (f?: File) => {
     if (!f) return
-    if (!OK.includes(f.type)) {
+    if (!isSupportedReceiptFile(f)) {
       alert(t('up.badType'))
       return
     }
@@ -2433,7 +2443,7 @@ export default function App(){
 
   const handleFilePicked = (f?: File) => {
     if (!f) return
-    if (!OK.includes(f.type)) {
+    if (!isSupportedReceiptFile(f)) {
       alert(t('up.badType'))
       return
     }
