@@ -11,6 +11,7 @@ PRAGMA synchronous = NORMAL;
 -- Master receipts table
 CREATE TABLE IF NOT EXISTS receipts (
     id TEXT PRIMARY KEY,
+    owner_id INTEGER NOT NULL REFERENCES shop_owner(id) ON DELETE CASCADE,
     file_path TEXT NOT NULL,
     file_name TEXT NOT NULL,
     file_hash TEXT NOT NULL,
@@ -60,9 +61,8 @@ CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(status);
 CREATE INDEX IF NOT EXISTS idx_receipts_vendor_date ON receipts(vendor, receipt_date);
 CREATE INDEX IF NOT EXISTS idx_items_receipt_id ON receipt_items(receipt_id);
 
--- The application is scoped to one shop owner.
 CREATE TABLE IF NOT EXISTS shop_owner (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     full_name TEXT NOT NULL,
     email TEXT NOT NULL COLLATE NOCASE UNIQUE,
     password_hash TEXT NOT NULL,
@@ -114,8 +114,66 @@ def init_db(db_path: str = None) -> None:
     with get_db(db_path) as conn:
         conn.executescript(SCHEMA_SQL)
 
+        owner_table = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'shop_owner';"
+        ).fetchone()
+        if owner_table and "CHECK (ID = 1)" in owner_table["sql"].upper():
+            conn.execute("PRAGMA foreign_keys = OFF;")
+            conn.execute(
+                """
+                CREATE TABLE shop_owner_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    full_name TEXT NOT NULL,
+                    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    business_name TEXT NOT NULL,
+                    phone TEXT NOT NULL DEFAULT '',
+                    address TEXT NOT NULL DEFAULT '',
+                    gstin TEXT NOT NULL DEFAULT '',
+                    language TEXT NOT NULL DEFAULT 'en',
+                    currency TEXT NOT NULL DEFAULT 'INR',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+            conn.execute(
+                "INSERT INTO shop_owner_new SELECT * FROM shop_owner;"
+            )
+            conn.execute(
+                """
+                CREATE TABLE login_sessions_new (
+                    token_hash TEXT PRIMARY KEY,
+                    owner_id INTEGER NOT NULL REFERENCES shop_owner_new(id) ON DELETE CASCADE,
+                    expires_at INTEGER NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+            conn.execute(
+                "INSERT INTO login_sessions_new SELECT * FROM login_sessions;"
+            )
+            conn.execute("DROP TABLE login_sessions;")
+            conn.execute("DROP TABLE shop_owner;")
+            conn.execute("ALTER TABLE shop_owner_new RENAME TO shop_owner;")
+            conn.execute("ALTER TABLE login_sessions_new RENAME TO login_sessions;")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_login_sessions_expiry ON login_sessions(expires_at);"
+            )
+            conn.commit()
+            conn.execute("PRAGMA foreign_keys = ON;")
+
         # Idempotent migrations for new receipt fields
         receipt_cols = {row[1] for row in conn.execute("PRAGMA table_info(receipts);").fetchall()}
+        if "owner_id" not in receipt_cols:
+            conn.execute(
+                "ALTER TABLE receipts ADD COLUMN owner_id INTEGER REFERENCES shop_owner(id) ON DELETE CASCADE;"
+            )
+            conn.execute(
+                "UPDATE receipts SET owner_id = (SELECT MIN(id) FROM shop_owner) WHERE owner_id IS NULL;"
+            )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_receipts_owner_id ON receipts(owner_id);"
+        )
         if "invoice_number" not in receipt_cols:
             conn.execute("ALTER TABLE receipts ADD COLUMN invoice_number TEXT;")
         if "tax_paise" not in receipt_cols:

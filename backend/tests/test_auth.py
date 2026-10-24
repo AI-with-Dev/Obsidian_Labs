@@ -1,4 +1,5 @@
 import sys
+import sqlite3
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -10,7 +11,7 @@ if str(root_dir) not in sys.path:
 import pytest
 
 from backend.app.config import settings
-from backend.app.database import init_db
+from backend.app.database import SCHEMA_SQL, get_db, init_db
 from backend.app.main import app
 
 
@@ -95,6 +96,112 @@ def test_https_cross_origin_session_cookie(client):
     assert "secure" in cookie
     assert "httponly" in cookie
     assert https_client.get("/api/auth/status").json()["data"]["authenticated"] is True
+
+
+def test_multiple_accounts_have_separate_ledgers_and_share_sessions(client):
+    create_account(client)
+    receipt_response = client.post(
+        "/api/receipts/upload",
+        files={"file": ("first.png", b"first account receipt", "image/png")},
+    )
+    assert receipt_response.status_code == 200
+    first_receipt_id = receipt_response.json()["data"]["id"]
+
+    second_client = TestClient(app)
+    second_account = {**ACCOUNT, "email": "second@example.com", "businessName": "Second Shop"}
+    created = second_client.post("/api/auth/setup", json=second_account)
+    assert created.status_code == 201
+    assert created.json()["data"]["account"]["email"] == second_account["email"]
+    assert second_client.get("/api/dashboard/summary").json()["data"]["reviewCount"] == 0
+    assert second_client.get(f"/api/receipts/{first_receipt_id}").status_code == 404
+
+    other_device = TestClient(app)
+    logged_in = other_device.post(
+        "/api/auth/login",
+        json={"email": ACCOUNT["email"], "password": PASSWORD},
+    )
+    assert logged_in.status_code == 200
+    assert other_device.get("/api/receipts").json()["data"][0]["id"] == first_receipt_id
+
+    client.post("/api/auth/logout")
+    switched = client.post(
+        "/api/auth/login",
+        json={"email": second_account["email"], "password": PASSWORD},
+    )
+    assert switched.status_code == 200
+    assert client.get("/api/dashboard/summary").json()["data"]["reviewCount"] == 0
+
+    duplicate_email = second_client.post("/api/auth/setup", json=second_account)
+    assert duplicate_email.status_code == 409
+    second_client.close()
+    other_device.close()
+
+
+def test_migration_preserves_single_owner_and_assigns_existing_receipts(tmp_path):
+    database_path = tmp_path / "legacy_shopledger.db"
+    legacy_schema = SCHEMA_SQL.replace(
+        "owner_id INTEGER NOT NULL REFERENCES shop_owner(id) ON DELETE CASCADE,\n    file_path",
+        "file_path",
+        1,
+    ).replace(
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,\n    full_name",
+        "id INTEGER PRIMARY KEY CHECK (id = 1),\n    full_name",
+        1,
+    )
+    connection = sqlite3.connect(database_path)
+    connection.executescript(legacy_schema)
+    connection.execute(
+        """
+        INSERT INTO shop_owner
+            (id, full_name, email, password_hash, business_name)
+        VALUES (1, 'Legacy Owner', 'legacy@example.com', 'legacy-hash', 'Legacy Shop');
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO login_sessions (token_hash, owner_id, expires_at)
+        VALUES ('legacy-session-hash', 1, 9999999999);
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO receipts
+            (id, file_path, file_name, file_hash, mime_type, status)
+        VALUES ('legacy-receipt', 'legacy.jpg', 'legacy.jpg', 'legacy-hash', 'image/jpeg', 'confirmed');
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    init_db(str(database_path))
+
+    with get_db(str(database_path)) as conn:
+        legacy_owner = conn.execute(
+            "SELECT id, email FROM shop_owner WHERE email = 'legacy@example.com';"
+        ).fetchone()
+        conn.execute(
+            """
+            INSERT INTO shop_owner
+                (full_name, email, password_hash, business_name)
+            VALUES ('New Owner', 'new@example.com', 'new-hash', 'New Shop');
+            """
+        )
+        new_owner = conn.execute(
+            "SELECT id FROM shop_owner WHERE email = 'new@example.com';"
+        ).fetchone()
+        legacy_receipt = conn.execute(
+            "SELECT owner_id FROM receipts WHERE id = 'legacy-receipt';"
+        ).fetchone()
+        session_owner = conn.execute(
+            "SELECT owner_id FROM login_sessions WHERE token_hash = 'legacy-session-hash';"
+        ).fetchone()
+        foreign_key_errors = conn.execute("PRAGMA foreign_key_check;").fetchall()
+
+    assert dict(legacy_owner) == {"id": 1, "email": "legacy@example.com"}
+    assert new_owner["id"] == 2
+    assert legacy_receipt["owner_id"] == 1
+    assert session_owner["owner_id"] == 1
+    assert foreign_key_errors == []
 
 
 @pytest.mark.parametrize(

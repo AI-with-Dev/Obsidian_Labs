@@ -1,7 +1,7 @@
 {
   "nav.settings": "Settings",
-  "auth.setupTitle": "Set up your owner account",
-  "auth.setupHelp": "Create your secure sign-in and add your shop details. This is the only owner account for this shop.",
+  "auth.setupTitle": "Create your account",
+  "auth.setupHelp": "Create a secure sign-in and set up your shop ledger.",
   "auth.loginTitle": "Welcome back",
   "auth.loginHelp": "Sign in to continue to your Vyapar Mitra account.",
   "auth.fullName": "Your full name",

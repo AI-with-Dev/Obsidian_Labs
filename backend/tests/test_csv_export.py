@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from backend.app.database import get_db, init_db
 from backend.app.main import app
 from backend.app.routers.export import sanitize_csv_cell
+from conftest import ensure_test_owner
 
 
 @pytest.fixture(autouse=True)
@@ -18,6 +19,7 @@ def setup_db(tmp_path, monkeypatch):
     monkeypatch.setattr("backend.app.config.settings.DATABASE_PATH", str(test_db))
     monkeypatch.setattr("backend.app.config.settings.UPLOAD_DIR", str(test_uploads))
     init_db(str(test_db))
+    ensure_test_owner(str(test_db))
 
 
 @pytest.fixture
@@ -61,36 +63,36 @@ def test_export_only_confirmed_receipts(client):
         # Confirmed receipt 1
         conn.execute(
             """
-            INSERT INTO receipts (id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
-            VALUES ('rec_1', 'confirmed', 'Gupta Papers', '2026-10-12', 'inventory', 'INR', 45000, 'path1.jpg', 'r1.jpg', 'hash1', 'image/jpeg');
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_1', 1, 'confirmed', 'Gupta Papers', '2026-10-12', 'inventory', 'INR', 45000, 'path1.jpg', 'r1.jpg', 'hash1', 'image/jpeg');
             """
         )
         # Confirmed receipt 2
         conn.execute(
             """
-            INSERT INTO receipts (id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
-            VALUES ('rec_2', 'confirmed', 'Sharma Book Depot', '2026-10-15', 'inventory', 'INR', 125000, 'path2.jpg', 'r2.jpg', 'hash2', 'image/jpeg');
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_2', 1, 'confirmed', 'Sharma Book Depot', '2026-10-15', 'inventory', 'INR', 125000, 'path2.jpg', 'r2.jpg', 'hash2', 'image/jpeg');
             """
         )
         # Needs review (draft)
         conn.execute(
             """
-            INSERT INTO receipts (id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
-            VALUES ('rec_draft', 'needs_review', 'Draft Vendor', '2026-10-14', 'packaging', 'INR', 20000, 'path3.jpg', 'r3.jpg', 'hash3', 'image/jpeg');
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_draft', 1, 'needs_review', 'Draft Vendor', '2026-10-14', 'packaging', 'INR', 20000, 'path3.jpg', 'r3.jpg', 'hash3', 'image/jpeg');
             """
         )
         # Duplicate
         conn.execute(
             """
-            INSERT INTO receipts (id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
-            VALUES ('rec_dup', 'duplicate', 'Duplicate Vendor', '2026-10-14', 'inventory', 'INR', 45000, 'path4.jpg', 'r4.jpg', 'hash4', 'image/jpeg');
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_dup', 1, 'duplicate', 'Duplicate Vendor', '2026-10-14', 'inventory', 'INR', 45000, 'path4.jpg', 'r4.jpg', 'hash4', 'image/jpeg');
             """
         )
         # Discarded
         conn.execute(
             """
-            INSERT INTO receipts (id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
-            VALUES ('rec_disc', 'discarded_duplicate', 'Discarded Vendor', '2026-10-10', 'repairs', 'INR', 30000, 'path5.jpg', 'r5.jpg', 'hash5', 'image/jpeg');
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_disc', 1, 'discarded_duplicate', 'Discarded Vendor', '2026-10-10', 'repairs', 'INR', 30000, 'path5.jpg', 'r5.jpg', 'hash5', 'image/jpeg');
             """
         )
         conn.commit()
@@ -113,14 +115,14 @@ def test_export_formula_injection_and_rfc4180_escaping(client):
     with get_db() as conn:
         conn.execute(
             """
-            INSERT INTO receipts (id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
-            VALUES ('rec_inj1', 'confirmed', '=SUM(1,2)', '2026-10-10', 'inventory', 'INR', 5000, 'p1.jpg', 'r1.jpg', 'h1', 'image/jpeg');
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_inj1', 1, 'confirmed', '=SUM(1,2)', '2026-10-10', 'inventory', 'INR', 5000, 'p1.jpg', 'r1.jpg', 'h1', 'image/jpeg');
             """
         )
         conn.execute(
             """
-            INSERT INTO receipts (id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
-            VALUES ('rec_inj2', 'confirmed', '@Attacker, "Special" Books', '2026-10-09', '+packaging', 'INR', 8500, 'p2.jpg', 'r2.jpg', 'h2', 'image/jpeg');
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_inj2', 1, 'confirmed', '@Attacker, "Special" Books', '2026-10-09', '+packaging', 'INR', 8500, 'p2.jpg', 'r2.jpg', 'h2', 'image/jpeg');
             """
         )
         conn.commit()

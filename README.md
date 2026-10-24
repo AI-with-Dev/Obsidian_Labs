@@ -108,9 +108,13 @@ The backend API server runs at [http://localhost:8000](http://localhost:8000). I
 
 To host the FastAPI API on Streamlit Community Cloud, set **Main file path** to `main.py` in the repository root. This root-level ASGI entry point exposes the backend app and responds to Streamlit's root and script health probes; it does not host the React/Vite frontend, which must still be deployed separately. Configure `GEMINI_API_KEY` in Streamlit's app secrets/environment settings if receipt extraction is needed.
 
+### Render data persistence
+
+For accounts and receipts to remain available across devices and backend restarts, attach a persistent disk to the Render backend service and set `DATABASE_PATH=/var/data/shopledger.db` and `UPLOAD_DIR=/var/data/uploads` (with the disk mounted at `/var/data`). SQLite stores data locally, so run a single backend instance when using this setup.
+
 ### First sign-in
 
-On first launch, create the shop's single owner account with your name, email, business details, preferred language, display currency, and a password. Passwords must be at least 12 characters and include uppercase and lowercase letters, a number, and a symbol; signup also asks you to confirm the password. The backend stores only a salted PBKDF2 password hash and issues an HTTP-only session cookie. Email/OTP verification is not enabled because this project has no email delivery service configured.
+Create an account with your name, email, business details, preferred language, display currency, and a password. Each account has its own private ledger; sign out to switch accounts, or sign into the same account on another device to access its data there. Passwords must be at least 12 characters and include uppercase and lowercase letters, a number, and a symbol; signup also asks you to confirm the password. The backend stores only a salted PBKDF2 password hash and issues an HTTP-only session cookie. Email/OTP verification is not enabled because this project has no email delivery service configured.
 
 After setup, use the email and password to sign in. The **Settings** page lets you edit your profile, language and display currency, change your password, export CSV/PDF reports, or sign out. Changing your password revokes other sessions. Currency selection changes display formatting only; it does not perform exchange-rate conversion. When the frontend and API are hosted on separate HTTPS origins, the HTTP-only session cookie uses `SameSite=None; Secure` so the browser can send it with credentialed API requests.
 
@@ -126,7 +130,7 @@ All JSON endpoints follow a consistent envelope structure:
 | :--- | :---: | :--- |
 | `/api/receipts/upload` | `POST` | Upload receipt image/PDF (returns `{ "id": string }`) |
 | `/api/auth/status` | `GET` | Check whether owner setup is complete and the browser is signed in |
-| `/api/auth/setup` | `POST` | Create the one-time owner account |
+| `/api/auth/setup` | `POST` | Create an account with its own private ledger |
 | `/api/auth/login` | `POST` | Start an owner session |
 | `/api/auth/logout` | `POST` | End the current owner session |
 | `/api/auth/profile` | `PATCH` | Update owner, business, and display preferences |

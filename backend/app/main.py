@@ -163,16 +163,17 @@ app.include_router(export_router)
 from fastapi.responses import Response
 
 @app.get("/api/export/pdf", dependencies=[Depends(require_authenticated_owner)])
-async def export_payments_pdf():
+async def export_payments_pdf(owner: dict = Depends(require_authenticated_owner)):
     """Export confirmed customer receipts/payments to official PDF format."""
     with get_db() as conn:
         rows = conn.execute(
             """
             SELECT vendor, receipt_date, category, currency, total_paise, transaction_type
             FROM receipts
-            WHERE status = 'confirmed'
+            WHERE owner_id = ? AND status = 'confirmed'
             ORDER BY receipt_date DESC, created_at DESC;
-            """
+            """,
+            (owner["id"],),
         ).fetchall()
 
         total_received = sum(

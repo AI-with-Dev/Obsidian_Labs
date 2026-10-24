@@ -12,6 +12,7 @@ if str(root_dir) not in sys.path:
 from backend.app.config import settings
 from backend.app.database import get_db, init_db
 from backend.app.main import app
+from conftest import ensure_test_owner
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +23,7 @@ def setup_isolated_db(tmp_path):
     temp_uploads.mkdir(parents=True, exist_ok=True)
 
     init_db(str(temp_db))
+    ensure_test_owner(str(temp_db))
 
     orig_db = settings.DATABASE_PATH
     orig_up = settings.UPLOAD_DIR

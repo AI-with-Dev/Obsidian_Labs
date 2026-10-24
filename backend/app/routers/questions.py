@@ -17,7 +17,10 @@ class AskQuestionPayload(BaseModel):
 
 
 @router.post("/ask", response_model=ApiResponse[dict])
-async def ask_question(payload: AskQuestionPayload):
+async def ask_question(
+    payload: AskQuestionPayload,
+    owner: dict = Depends(require_authenticated_owner),
+):
     """Answer owner questions safely using fixed backend queries, application math, and supporting evidence."""
-    data = execute_question_answer(payload.question, payload.lang)
+    data = execute_question_answer(payload.question, payload.lang, owner["id"])
     return ApiResponse.ok(data)

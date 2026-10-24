@@ -33,7 +33,7 @@ def sanitize_csv_cell(value: Any) -> str:
 
 
 @router.get("/csv")
-async def export_expenses_csv() -> Response:
+async def export_expenses_csv(owner: dict = Depends(require_authenticated_owner)) -> Response:
     """
     Export confirmed receipts to CSV format.
     Ensures formula injection protection and strictly standard RFC 4180 escaping.
@@ -44,9 +44,10 @@ async def export_expenses_csv() -> Response:
             """
             SELECT vendor, receipt_date, category, currency, total_paise
             FROM receipts
-            WHERE status = 'confirmed' AND transaction_type = 'expense'
+            WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense'
             ORDER BY receipt_date DESC, created_at DESC;
-            """
+            """,
+            (owner["id"],),
         ).fetchall()
 
     output = io.StringIO()

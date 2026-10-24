@@ -11,7 +11,7 @@ router = APIRouter(
 
 
 @router.get("/summary", response_model=ApiResponse[dict])
-async def get_dashboard_summary():
+async def get_dashboard_summary(owner: dict = Depends(require_authenticated_owner)):
     """Calculate dashboard summaries strictly from confirmed receipts in backend application code."""
     with get_db() as conn:
         spent_row = conn.execute(
@@ -19,39 +19,44 @@ async def get_dashboard_summary():
             SELECT COALESCE(SUM(total_paise), 0) AS total_paise,
                    COUNT(*) AS confirmed_count
             FROM receipts
-            WHERE status = 'confirmed' AND transaction_type = 'expense';
-            """
+            WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense';
+            """,
+            (owner["id"],),
         ).fetchone()
 
         received_row = conn.execute(
             """
             SELECT COALESCE(SUM(total_paise), 0) AS total_paise
             FROM receipts
-            WHERE status = 'confirmed' AND transaction_type = 'income';
-            """
+            WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'income';
+            """,
+            (owner["id"],),
         ).fetchone()
 
         confirmed_row = conn.execute(
-            "SELECT COUNT(*) AS confirmed_count FROM receipts WHERE status = 'confirmed';"
+            "SELECT COUNT(*) AS confirmed_count FROM receipts WHERE owner_id = ? AND status = 'confirmed';",
+            (owner["id"],),
         ).fetchone()
 
         review_row = conn.execute(
             """
             SELECT COUNT(*) AS review_count
             FROM receipts
-            WHERE status != 'confirmed' AND status != 'discarded_duplicate';
-            """
+            WHERE owner_id = ? AND status != 'confirmed' AND status != 'discarded_duplicate';
+            """,
+            (owner["id"],),
         ).fetchone()
 
         vendors_cursor = conn.execute(
             """
             SELECT TRIM(vendor) AS vendor_name, COALESCE(SUM(total_paise), 0) AS vendor_paise
             FROM receipts
-            WHERE status = 'confirmed' AND transaction_type = 'expense' AND TRIM(vendor) != ''
+            WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense' AND TRIM(vendor) != ''
             GROUP BY TRIM(vendor)
             ORDER BY vendor_paise DESC
             LIMIT 5;
-            """
+            """,
+            (owner["id"],),
         )
 
         top_vendors = [
@@ -81,18 +86,19 @@ async def get_dashboard_summary():
 
 
 @router.get("/categories", response_model=ApiResponse[list])
-async def get_dashboard_categories():
+async def get_dashboard_categories(owner: dict = Depends(require_authenticated_owner)):
     """Calculate category totals strictly from confirmed receipts in backend application code."""
     with get_db() as conn:
         cursor = conn.execute(
             """
             SELECT LOWER(TRIM(category)) AS cat_name, COALESCE(SUM(total_paise), 0) AS category_paise
             FROM receipts
-            WHERE status = 'confirmed' AND transaction_type = 'expense'
+            WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense'
               AND category IS NOT NULL AND TRIM(category) != ''
             GROUP BY LOWER(TRIM(category))
             ORDER BY category_paise DESC;
-            """
+            """,
+            (owner["id"],),
         )
 
         categories = [
