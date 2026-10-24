@@ -1,5 +1,11 @@
+import sys
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+repository_root = str(Path(__file__).resolve().parents[2])
+if repository_root not in sys.path:
+    sys.path.insert(0, repository_root)
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -22,16 +28,16 @@ logger = logging.getLogger("shopledger.backend")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle event handler for FastAPI."""
-    logger.info("Initializing ShopLedger database and storage...")
+    logger.info("Initializing Vyapar Mitra database and storage...")
     init_db()
     settings.upload_dir_resolved.mkdir(parents=True, exist_ok=True)
     logger.info("Backend initialization complete.")
     yield
-    logger.info("ShopLedger backend shutting down.")
+    logger.info("Vyapar Mitra backend shutting down.")
 
 
 app = FastAPI(
-    title="ShopLedger API",
+    title="Vyapar Mitra API",
     description="Expense management and receipt extraction backend for Indian small shops.",
     version="0.1.0",
     lifespan=lifespan,
@@ -91,6 +97,22 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 # Health Check Endpoint
+@app.get("/")
+async def root_health_check():
+    """Respond to hosting platforms that probe the application root."""
+    return {
+        "status": "ok",
+        "service": "Vyapar Mitra API",
+        "frontend": "hosted separately",
+    }
+
+
+@app.get("/script-health-check")
+async def streamlit_script_health_check():
+    """Respond to Streamlit Community Cloud's script health probe."""
+    return {"status": "ok"}
+
+
 @app.get("/api/health", response_model=ApiResponse[dict])
 async def health_check():
     """Verify backend and database health."""
@@ -107,6 +129,21 @@ async def health_check():
         "database": db_status,
         "version": "0.1.0",
     })
+
+
+@app.get("/healthz")
+async def streamlit_health_check():
+    """Provide the plain HTTP health endpoint expected by Streamlit hosting."""
+    try:
+        with get_db() as conn:
+            conn.execute("SELECT 1;").fetchone()
+    except Exception as exc:
+        logger.error("Streamlit health check database failure: %s", exc)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "unhealthy"},
+        )
+    return {"status": "ok"}
 
 
 # Routers
@@ -126,31 +163,41 @@ app.include_router(export_router)
 from fastapi.responses import Response
 
 @app.get("/api/export/pdf", dependencies=[Depends(require_authenticated_owner)])
-async def export_payments_pdf():
+async def export_payments_pdf(owner: dict = Depends(require_authenticated_owner)):
     """Export confirmed customer receipts/payments to official PDF format."""
     with get_db() as conn:
         rows = conn.execute(
             """
-            SELECT vendor, receipt_date, category, currency, total_paise
+            SELECT vendor, receipt_date, category, currency, total_paise, transaction_type
             FROM receipts
-            WHERE status = 'confirmed'
+            WHERE owner_id = ? AND status = 'confirmed'
             ORDER BY receipt_date DESC, created_at DESC;
-            """
+            """,
+            (owner["id"],),
         ).fetchall()
 
-        total_received = sum(r["total_paise"] or 0 for r in rows) / 100.0
+        total_received = sum(
+            r["total_paise"] or 0 for r in rows if r["transaction_type"] == "income"
+        ) / 100.0
+        total_spent = sum(
+            r["total_paise"] or 0 for r in rows if r["transaction_type"] == "expense"
+        ) / 100.0
 
-        stream = "BT /F1 16 Tf 50 780 Td (ShopLedger - Official Payment & Collections Summary) Tj\n"
-        stream += f"/F2 10 Tf 0 -22 Td (Export Format: Official PDF | Total Records: {len(rows)}) Tj\n"
+        stream = "BT /F1 16 Tf 50 780 Td (Vyapar Mitra - Official Ledger Summary) Tj\n"
+        stream += f"/F2 10 Tf 0 -22 Td (Export Format: Official PDF | Total Entries: {len(rows)}) Tj\n"
         stream += f"/F1 12 Tf 0 -24 Td (TOTAL MONEY RECEIVED: (+) INR {total_received:,.2f}) Tj\n"
-        stream += "/F1 10 Tf 0 -28 Td (Date         Customer / Payer                  Amount) Tj\n"
+        stream += f"/F1 10 Tf 0 -18 Td (TOTAL ACTIVE CREDIT / BORROWED: (Udhar) INR {total_spent:,.2f}) Tj\n"
+        stream += "/F1 10 Tf 0 -28 Td (Date         Type      Customer / Party                  Amount) Tj\n"
         stream += "/F2 9 Tf 0 -5 Td (--------------------------------------------------------------------------------) Tj\n"
 
         for r in rows[:30]:
             d = (r["receipt_date"] or "----").ljust(12)
-            name = (r["vendor"] or "Unknown Customer")[:32].ljust(34)
-            amt = f"(+) INR {(r['total_paise'] or 0)/100.0:,.2f}"
-            line = f"{d} {name} {amt}".replace("(", "").replace(")", "").replace("\\", "")
+            transaction_type = r["transaction_type"]
+            label = "Received" if transaction_type == "income" else "Borrowed"
+            sign = "+" if transaction_type == "income" else "-"
+            name = (r["vendor"] or "Unknown")[:32].ljust(34)
+            amt = f"({sign}) INR {(r['total_paise'] or 0)/100.0:,.2f}"
+            line = f"{d} {label.ljust(9)} {name} {amt}".replace("(", "").replace(")", "").replace("\\", "")
             stream += f"0 -18 Td ({line}) Tj\n"
 
         stream += "ET"
@@ -182,5 +229,5 @@ async def export_payments_pdf():
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": "attachment; filename=shopledger-payment-summary.pdf"},
+            headers={"Content-Disposition": "attachment; filename=vyapar-mitra-payment-summary.pdf"},
         )

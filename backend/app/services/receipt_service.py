@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -11,6 +12,8 @@ from fastapi import HTTPException, UploadFile, status
 from backend.app.config import settings
 from backend.app.database import get_db
 from backend.app.models import ReceiptUpdatePayload, VoiceQuickEntryPayload
+
+logger = logging.getLogger("shopledger.receipts")
 
 ALLOWED_MIMES = {
     "image/jpeg": ".jpg",
@@ -33,7 +36,14 @@ def normalize_vendor_name(vendor: Optional[str]) -> str:
     """Normalize vendor name for duplicate comparison: lowercase alphanumeric only."""
     if not vendor:
         return ""
-    return re.sub(r"[^a-z0-9]", "", vendor.lower())
+    return "".join(char for char in vendor.casefold() if char.isalnum())
+
+
+def receipt_matches_owner_business(firm_name: Optional[str], business_name: Optional[str]) -> bool:
+    """Treat a receipt as income only when its issuing firm matches the owner's business."""
+    normalized_firm = normalize_vendor_name(firm_name)
+    normalized_owner = normalize_vendor_name(business_name)
+    return bool(normalized_firm and normalized_owner and normalized_firm == normalized_owner)
 
 
 def find_similar_confirmed_duplicate(
@@ -41,6 +51,7 @@ def find_similar_confirmed_duplicate(
     receipt_date: str,
     total_paise: Optional[int],
     exclude_id: str,
+    owner_id: int = 1,
 ) -> Optional[dict]:
     """Check if normalized vendor + receipt_date + total_paise matches an existing confirmed receipt."""
     if not vendor or not receipt_date or total_paise is None or total_paise <= 0:
@@ -55,9 +66,10 @@ def find_similar_confirmed_duplicate(
             """
             SELECT id, vendor, receipt_date, total_paise
             FROM receipts
-            WHERE status = 'confirmed' AND receipt_date = ? AND total_paise = ? AND id != ?;
+            WHERE owner_id = ? AND status = 'confirmed'
+              AND receipt_date = ? AND total_paise = ? AND id != ?;
             """,
-            (receipt_date, total_paise, exclude_id),
+            (owner_id, receipt_date, total_paise, exclude_id),
         ).fetchall()
 
         for r in rows:
@@ -67,7 +79,7 @@ def find_similar_confirmed_duplicate(
     return None
 
 
-async def process_and_save_upload(file: UploadFile) -> str:
+async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
     """Validate, hash, store upload, check SHA-256 duplicates, and record in database."""
     raw_filename = file.filename or "receipt.jpg"
     safe_name = sanitize_filename(raw_filename)
@@ -125,10 +137,10 @@ async def process_and_save_upload(file: UploadFile) -> str:
         existing = conn.execute(
             """
             SELECT id FROM receipts
-            WHERE file_hash = ? AND status != 'discarded_duplicate'
+            WHERE owner_id = ? AND file_hash = ? AND status != 'discarded_duplicate'
             ORDER BY created_at ASC LIMIT 1;
             """,
-            (file_hash,),
+            (owner_id, file_hash),
         ).fetchone()
 
         if existing:
@@ -140,12 +152,13 @@ async def process_and_save_upload(file: UploadFile) -> str:
         conn.execute(
             """
             INSERT INTO receipts (
-                id, file_path, file_name, file_hash, mime_type,
+                id, owner_id, file_path, file_name, file_hash, mime_type,
                 currency, status, flags_json, duplicate_of_receipt_id
-            ) VALUES (?, ?, ?, ?, ?, 'INR', ?, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, 'INR', ?, ?, ?);
             """,
             (
                 receipt_id,
+                owner_id,
                 str(target_path),
                 safe_name,
                 file_hash,
@@ -178,12 +191,12 @@ async def process_and_save_upload(file: UploadFile) -> str:
     return receipt_id
 
 
-def get_receipt_file(receipt_id: str) -> Tuple[Path, str, str]:
+def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path, str, str]:
     """Retrieve file path, mime type, and filename for an existing receipt."""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT file_path, mime_type, file_name FROM receipts WHERE id = ?;",
-            (receipt_id,),
+            "SELECT file_path, mime_type, file_name FROM receipts WHERE id = ? AND owner_id = ?;",
+            (receipt_id, owner_id),
         ).fetchone()
 
         if not row:
@@ -202,18 +215,53 @@ def get_receipt_file(receipt_id: str) -> Tuple[Path, str, str]:
         return file_path, row["mime_type"], row["file_name"]
 
 
-def get_receipt_details(receipt_id: str) -> dict:
+def delete_receipt(receipt_id: str, owner_id: int = 1) -> None:
+    """Permanently delete a receipt and its uploaded file."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT file_path FROM receipts WHERE id = ? AND owner_id = ?;",
+            (receipt_id, owner_id),
+        ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Receipt with ID '{receipt_id}' not found.",
+            )
+
+        file_path = Path(row["file_path"])
+        upload_dir = settings.upload_dir_resolved.resolve()
+        if file_path.resolve().parent != upload_dir:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Receipt file is outside the configured uploads directory.",
+            )
+
+        conn.execute("DELETE FROM receipts WHERE id = ? AND owner_id = ?;", (receipt_id, owner_id))
+
+    try:
+        file_path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.exception("Receipt %s was deleted, but its uploaded file could not be removed", receipt_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Receipt was deleted, but its uploaded file could not be removed.",
+        ) from exc
+
+
+def get_receipt_details(receipt_id: str, owner_id: int = 1) -> dict:
     """Retrieve receipt details and line items formatted for the frontend."""
     with get_db() as conn:
         row = conn.execute(
             """
             SELECT id, file_path, file_name, vendor, receipt_date, currency,
-                   total_paise, category, status, flags_json, duplicate_of_receipt_id,
-                   invoice_number, tax_paise, discount_paise, payment_method, notes, data
+                   total_paise, category, firm_name, customer_name, transaction_type,
+                   status, flags_json, duplicate_of_receipt_id, data, type,
+                   invoice_number, tax_paise, discount_paise, payment_method, notes
             FROM receipts
-            WHERE id = ?;
+            WHERE id = ? AND owner_id = ?;
             """,
-            (receipt_id,),
+            (receipt_id, owner_id),
         ).fetchone()
 
         if not row:
@@ -260,8 +308,9 @@ def get_receipt_details(receipt_id: str) -> dict:
         tax_val = (row["tax_paise"] / 100.0) if row["tax_paise"] is not None else None
         discount_val = (row["discount_paise"] / 100.0) if row["discount_paise"] is not None else None
 
-        row_keys = row.keys() if hasattr(row, "keys") else []
-        tx_type = row["type"] if ("type" in row_keys and row["type"]) else ("income" if str(row["id"]).startswith("rec_voice_") else "expense")
+        tx_type = row["transaction_type"] or row["type"] or (
+            "income" if str(row["id"]).startswith("rec_voice_") else "expense"
+        )
 
         return {
             "id": row["id"],
@@ -291,24 +340,70 @@ from decimal import Decimal
 from backend.app.services.gemini_service import extract_receipt_with_gemini
 
 
-async def perform_receipt_extraction(receipt_id: str) -> dict:
+async def perform_receipt_extraction(
+    receipt_id: str,
+    owner_business_name: str = "",
+    owner_id: int = 1,
+) -> dict:
     """Run structured Gemini extraction on receipt file, check duplicates, save to DB, and return Receipt shape."""
-    file_path, mime_type, _ = get_receipt_file(receipt_id)
+    file_path, mime_type, _ = get_receipt_file(receipt_id, owner_id)
 
     # Mark as extracting
     with get_db() as conn:
-        conn.execute("UPDATE receipts SET status = 'extracting' WHERE id = ?;", (receipt_id,))
+        conn.execute(
+            "UPDATE receipts SET status = 'extracting' WHERE id = ? AND owner_id = ?;",
+            (receipt_id, owner_id),
+        )
 
     try:
         extraction, raw_json = extract_receipt_with_gemini(file_path, mime_type)
     except Exception as e:
         with get_db() as conn:
-            conn.execute("UPDATE receipts SET status = 'extraction_failed' WHERE id = ?;", (receipt_id,))
+            conn.execute(
+                "UPDATE receipts SET status = 'extraction_failed' WHERE id = ? AND owner_id = ?;",
+                (receipt_id, owner_id),
+            )
             conn.execute(
                 "INSERT INTO receipt_events (receipt_id, event_type, details_json) VALUES (?, 'EXTRACTION_FAILED', ?);",
                 (receipt_id, json.dumps({"error": str(e)})),
             )
         raise
+
+    firm_name = (extraction.firm_name or "").strip()
+    party_name = (getattr(extraction, "party_name", None) or "").strip()
+    customer_name = (extraction.customer_name or "").strip()
+
+    # Determine transaction type:
+    if extraction.transaction_type:
+        txn_str = extraction.transaction_type.lower()
+        if txn_str in {"income", "received", "jama", "deposit"}:
+            is_income = True
+        elif txn_str in {"expense", "borrowed", "credit", "udhar"}:
+            is_income = False
+        else:
+            is_income = receipt_matches_owner_business(firm_name, owner_business_name)
+    else:
+        is_income = receipt_matches_owner_business(firm_name, owner_business_name)
+
+    # Resolve party/person name:
+    if is_income:
+        vendor_name = (customer_name or party_name or extraction.vendor or firm_name or "").strip()
+    else:
+        vendor_name = (firm_name or extraction.vendor or party_name or customer_name or "").strip()
+
+    flags = list(extraction.uncertainty_flags)
+    if vendor_name:
+        if "vendor" in flags:
+            flags.remove("vendor")
+    else:
+        if "vendor" not in flags:
+            flags.append("vendor")
+
+    # If informal note had total but no line items (e.g. "Suresh bhai 500 jama" or "Ramesh 20 rupay"):
+    if not extraction.items and extraction.total and extraction.total > 0:
+        from backend.app.services.gemini_service import ExtractedLineItem
+        desc = "Cash Received / Jama" if is_income else "Borrowed Goods / Udhar"
+        extraction.items.append(ExtractedLineItem(name=desc, amount=extraction.total))
 
     # Convert total to integer paise
     total_paise: Optional[int] = None
@@ -321,14 +416,12 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
     with get_db() as conn:
         # Check if already flagged as duplicate by exact SHA-256 upload
         curr = conn.execute(
-            "SELECT duplicate_of_receipt_id, status FROM receipts WHERE id = ?;",
-            (receipt_id,),
+            "SELECT duplicate_of_receipt_id, status FROM receipts WHERE id = ? AND owner_id = ?;",
+            (receipt_id, owner_id),
         ).fetchone()
 
         duplicate_of_id = curr["duplicate_of_receipt_id"] if curr else None
         new_status = "needs_review"
-        flags = list(extraction.uncertainty_flags)
-
         if duplicate_of_id:
             new_status = "duplicate"
             if "duplicate" not in flags:
@@ -336,10 +429,11 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
         else:
             # Check for similar duplicate against confirmed receipts
             similar = find_similar_confirmed_duplicate(
-                vendor=extraction.vendor or "",
+                vendor=vendor_name or extraction.vendor or "",
                 receipt_date=extraction.date or "",
                 total_paise=total_paise,
                 exclude_id=receipt_id,
+                owner_id=owner_id,
             )
             if similar:
                 duplicate_of_id = similar["id"]
@@ -370,6 +464,9 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
             """
             UPDATE receipts
             SET vendor = ?,
+                firm_name = ?,
+                customer_name = ?,
+                transaction_type = ?,
                 receipt_date = ?,
                 currency = ?,
                 total_paise = ?,
@@ -379,10 +476,13 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
                 raw_extraction_json = ?,
                 flags_json = ?,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?;
+            WHERE id = ? AND owner_id = ?;
             """,
             (
-                extraction.vendor or "",
+                vendor_name,
+                firm_name,
+                customer_name,
+                "income" if is_income else "expense",
                 extraction.date or "",
                 extraction.currency or "INR",
                 total_paise,
@@ -392,6 +492,7 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
                 raw_json,
                 json.dumps(flags),
                 receipt_id,
+                owner_id,
             ),
         )
 
@@ -404,6 +505,9 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
                 receipt_id,
                 json.dumps({
                     "vendor": extraction.vendor,
+                    "firm_name": firm_name,
+                    "customer_name": customer_name,
+                    "transaction_type": "income" if is_income else "expense",
                     "total": extraction.total,
                     "category": extraction.suggested_category,
                     "items_count": len(extraction.items),
@@ -414,7 +518,7 @@ async def perform_receipt_extraction(receipt_id: str) -> dict:
             ),
         )
 
-    return get_receipt_details(receipt_id)
+    return get_receipt_details(receipt_id, owner_id)
 
 
 def list_receipts(
@@ -424,10 +528,12 @@ def list_receipts(
     category: Optional[str] = None,
     vendor: Optional[str] = None,
     status_filter: Optional[str] = None,
+    owner_id: int = 1,
 ) -> list:
     """List receipts matching search and filter parameters."""
-    query = "SELECT id FROM receipts WHERE status != 'discarded_duplicate' AND status != 'extraction_failed'"
-    params = []
+    query = "SELECT id FROM receipts WHERE owner_id = ? AND status != 'discarded_duplicate'"
+    params = [owner_id]
+    query += " AND status != 'extraction_failed'"
 
     if status_filter == "confirmed":
         query += " AND status = 'confirmed'"
@@ -454,7 +560,7 @@ def list_receipts(
 
     with get_db() as conn:
         rows = conn.execute(query, params).fetchall()
-        results = [get_receipt_details(r["id"]) for r in rows]
+        results = [get_receipt_details(r["id"], owner_id) for r in rows]
 
         if q and q.strip():
             term = q.strip().lower()
@@ -484,12 +590,21 @@ ALLOWED_CONFIRM_CATEGORIES = {
 }
 
 
-def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
+def save_receipt_draft(
+    receipt_id: str,
+    payload: ReceiptUpdatePayload,
+    owner_id: int = 1,
+) -> dict:
     """Save owner corrections and draft edits for an existing receipt."""
+    get_receipt_details(receipt_id, owner_id)
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id, status, flags_json FROM receipts WHERE id = ?;",
-            (receipt_id,),
+            """
+            SELECT id, status, flags_json, category, transaction_type
+            FROM receipts
+            WHERE id = ? AND owner_id = ?;
+            """,
+            (receipt_id, owner_id),
         ).fetchone()
 
         if not row:
@@ -552,6 +667,15 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
             except Exception:
                 discount_paise = None
 
+        new_txn_type = None
+        raw_txn = payload.type or payload.transactionType
+        if raw_txn:
+            rt = raw_txn.strip().lower()
+            if rt in {"income", "received", "jama", "deposit"}:
+                new_txn_type = "income"
+            elif rt in {"expense", "borrowed", "credit", "udhar"}:
+                new_txn_type = "expense"
+
         # Update receipt record
         conn.execute(
             """
@@ -561,6 +685,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 currency = ?,
                 total_paise = ?,
                 category = ?,
+                transaction_type = COALESCE(?, transaction_type),
                 invoice_number = COALESCE(?, invoice_number),
                 tax_paise = COALESCE(?, tax_paise),
                 discount_paise = COALESCE(?, discount_paise),
@@ -569,7 +694,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 data = COALESCE(?, data),
                 flags_json = ?,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?;
+            WHERE id = ? AND owner_id = ?;
             """,
             (
                 vendor,
@@ -577,6 +702,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 currency,
                 total_paise,
                 category,
+                new_txn_type,
                 invoice_number,
                 tax_paise,
                 discount_paise,
@@ -585,6 +711,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 data_val,
                 json.dumps(list(existing_flags)),
                 receipt_id,
+                owner_id,
             ),
         )
 
@@ -630,19 +757,20 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
             ),
         )
 
-    return get_receipt_details(receipt_id)
+    return get_receipt_details(receipt_id, owner_id)
 
 
-def confirm_receipt(receipt_id: str) -> dict:
+def confirm_receipt(receipt_id: str, owner_id: int = 1) -> dict:
     """Validate and explicitly confirm receipt into the trusted ledger."""
+    get_receipt_details(receipt_id, owner_id)
     with get_db() as conn:
         row = conn.execute(
             """
             SELECT id, vendor, receipt_date, currency, total_paise, category, status
             FROM receipts
-            WHERE id = ?;
+            WHERE id = ? AND owner_id = ?;
             """,
-            (receipt_id,),
+            (receipt_id, owner_id),
         ).fetchone()
 
         if not row:
@@ -659,7 +787,7 @@ def confirm_receipt(receipt_id: str) -> dict:
 
         if row["status"] == "confirmed":
             # Already confirmed, idempotent return
-            return get_receipt_details(receipt_id)
+            return get_receipt_details(receipt_id, owner_id)
 
         # Strict validations: nonempty vendor, valid ISO date, currency INR, positive total, allowed category
         errors = []
@@ -706,9 +834,9 @@ def confirm_receipt(receipt_id: str) -> dict:
                 confirmed_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP,
                 flags_json = '[]'
-            WHERE id = ?;
+            WHERE id = ? AND owner_id = ?;
             """,
-            (receipt_id,),
+            (receipt_id, owner_id),
         )
 
         conn.execute(
@@ -727,15 +855,16 @@ def confirm_receipt(receipt_id: str) -> dict:
             ),
         )
 
-    return get_receipt_details(receipt_id)
+    return get_receipt_details(receipt_id, owner_id)
 
 
-def discard_duplicate(receipt_id: str) -> None:
+def discard_duplicate(receipt_id: str, owner_id: int = 1) -> None:
     """Mark duplicate receipt upload as discarded."""
+    get_receipt_details(receipt_id, owner_id)
     with get_db() as conn:
         conn.execute(
-            "UPDATE receipts SET status = 'discarded_duplicate', updated_at = CURRENT_TIMESTAMP WHERE id = ?;",
-            (receipt_id,),
+            "UPDATE receipts SET status = 'discarded_duplicate', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_id = ?;",
+            (receipt_id, owner_id),
         )
         conn.execute(
             "INSERT INTO receipt_events (receipt_id, event_type, details_json) VALUES (?, 'DISCARDED_DUPLICATE', NULL);",
@@ -743,10 +872,14 @@ def discard_duplicate(receipt_id: str) -> None:
         )
 
 
-def keep_separate(receipt_id: str) -> dict:
+def keep_separate(receipt_id: str, owner_id: int = 1) -> dict:
     """Reset potential duplicate upload to needs_review as a distinct expense."""
+    get_receipt_details(receipt_id, owner_id)
     with get_db() as conn:
-        row = conn.execute("SELECT flags_json FROM receipts WHERE id = ?;", (receipt_id,)).fetchone()
+        row = conn.execute(
+            "SELECT flags_json FROM receipts WHERE id = ? AND owner_id = ?;",
+            (receipt_id, owner_id),
+        ).fetchone()
         flags = [f for f in json.loads(row["flags_json"] or "[]") if f != "duplicate"] if row else []
         conn.execute(
             """
@@ -755,19 +888,19 @@ def keep_separate(receipt_id: str) -> dict:
                 status = 'needs_review',
                 flags_json = ?,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?;
+            WHERE id = ? AND owner_id = ?;
             """,
-            (json.dumps(flags), receipt_id),
+            (json.dumps(flags), receipt_id, owner_id),
         )
         conn.execute(
             "INSERT INTO receipt_events (receipt_id, event_type, details_json) VALUES (?, 'KEPT_SEPARATE', NULL);",
             (receipt_id,),
         )
 
-    return get_receipt_details(receipt_id)
+    return get_receipt_details(receipt_id, owner_id)
 
 
-def create_voice_quick_entry(payload: VoiceQuickEntryPayload) -> dict:
+def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> dict:
     """Create a confirmed income entry from voice audio input."""
     if payload.amount <= 0:
         raise HTTPException(
@@ -806,13 +939,14 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload) -> dict:
         conn.execute(
             """
             INSERT INTO receipts (
-                id, file_path, file_name, file_hash, mime_type, vendor,
-                receipt_date, currency, total_paise, category, status,
-                flags_json, data, notes, type, confirmed_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'INR', ?, ?, 'confirmed', '[]', ?, ?, 'income', ?, ?);
+                id, owner_id, file_path, file_name, file_hash, mime_type, vendor,
+                receipt_date, currency, total_paise, category, transaction_type, type, status,
+                flags_json, data, notes, confirmed_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'INR', ?, ?, 'income', 'income', 'confirmed', '[]', ?, ?, ?, ?);
             """,
             (
                 receipt_id,
+                owner_id,
                 str(voucher_path),
                 voucher_filename,
                 file_hash,
@@ -846,5 +980,4 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload) -> dict:
             (receipt_id, json.dumps({"spoken_text": payload.spoken_text, "amount": payload.amount, "data": spoken_data})),
         )
 
-    return get_receipt_details(receipt_id)
-
+    return get_receipt_details(receipt_id, owner_id)

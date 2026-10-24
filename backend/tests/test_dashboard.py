@@ -2,7 +2,8 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
-from backend.app.database import init_db
+from backend.app.database import get_db, init_db
+from conftest import ensure_test_owner
 
 
 @pytest.fixture(autouse=True)
@@ -15,6 +16,7 @@ def setup_db(tmp_path, monkeypatch):
     monkeypatch.setattr("backend.app.config.settings.DATABASE_PATH", str(test_db))
     monkeypatch.setattr("backend.app.config.settings.UPLOAD_DIR", str(test_uploads))
     init_db(str(test_db))
+    ensure_test_owner(str(test_db))
 
 
 client = TestClient(app)
@@ -26,6 +28,7 @@ def test_empty_dashboard():
     assert res_summary.status_code == 200
     summary = res_summary.json()["data"]
     assert summary["totalSpent"] == 0.0
+    assert summary["totalBalance"] == 0.0
     assert summary["confirmedCount"] == 0
     assert summary["reviewCount"] == 0
     assert summary["topVendors"] == []
@@ -104,3 +107,47 @@ def test_dashboard_aggregations_and_precision():
     assert cats[0]["amount"] == 6800.50  # 1800.50 + 5000.00
     assert cats[1]["category"] == "packaging"
     assert cats[1]["amount"] == 199.50
+
+
+def test_dashboard_separates_received_income_from_spending():
+    """Dashboard balance is confirmed income minus confirmed expenses."""
+    income_id = client.post(
+        "/api/receipts/upload",
+        files={"file": ("sale.png", io.BytesIO(b"income receipt"), "image/png")},
+    ).json()["data"]["id"]
+    client.patch(
+        f"/api/receipts/{income_id}",
+        json={
+            "vendor": "Customer",
+            "date": "2026-10-20",
+            "total": 750.0,
+            "category": "retail_sales",
+        },
+    )
+    client.post(f"/api/receipts/{income_id}/confirm")
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE receipts SET transaction_type = 'income' WHERE id = ?;",
+            (income_id,),
+        )
+
+    expense_id = client.post(
+        "/api/receipts/upload",
+        files={"file": ("purchase.png", io.BytesIO(b"expense receipt"), "image/png")},
+    ).json()["data"]["id"]
+    client.patch(
+        f"/api/receipts/{expense_id}",
+        json={
+            "vendor": "Paper Supplier",
+            "date": "2026-10-21",
+            "total": 300.0,
+            "category": "inventory",
+        },
+    )
+    client.post(f"/api/receipts/{expense_id}/confirm")
+
+    summary = client.get("/api/dashboard/summary").json()["data"]
+    assert summary["totalSpent"] == 300.0
+    assert summary["totalReceived"] == 750.0
+    assert summary["totalBalance"] == 450.0
+    assert summary["confirmedCount"] == 2

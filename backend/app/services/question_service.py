@@ -57,16 +57,24 @@ def classify_intent_deterministic(question: str) -> Optional[Tuple[str, Dict]]:
     if any(term in q for term in unsupported_terms):
         return "UNSUPPORTED", {}
 
-    # 2. Waiting review intent
+    # 2. Money Received intent (collections, payments received)
+    if any(k in q for k in ["money received", "total received", "how much received", "collections", "collected", "कुल प्राप्त", "कितने पैसे मिले", "प्राप्त राशि", "जमा राशि", "जमा"]):
+        return "TOTAL_RECEIVED", {}
+
+    # 3. Borrowed items / credit udhar intent
+    if any(k in q for k in ["borrowed", "active credit", "total credit", "how much udhar", "udhar", "बाकी उधार", "कुल उधार", "सामान लिया", "सामान दिया", "लेन-देन"]):
+        return "TOTAL_BORROWED", {}
+
+    # 4. Waiting review intent
     if any(k in q for k in ["waiting", "pending", "review", "बाकी", "समीक्षा", "लंबित"]):
-        if any(w in q for w in ["receipt", "bill", "invoice", "रसीद", "बिल"]):
+        if any(w in q for w in ["receipt", "bill", "invoice", "रसीद", "बिल", "entry"]):
             return "WAITING_REVIEW", {}
 
-    # 3. Top vendor intent
+    # 5. Top vendor intent
     if any(k in q for k in ["highest", "top vendor", "most spent", "which vendor", "which shop", "max spend", "सबसे ज्यादा", "सबसे अधिक", "किस विक्रेता"]):
         return "TOP_VENDOR", {}
 
-    # 4. Category spend intent
+    # 6. Category spend intent
     for cat in ["inventory", "packaging", "transport", "utilities", "rent", "repairs"]:
         if cat in q:
             return "CATEGORY_SPEND", {"category": cat}
@@ -79,7 +87,7 @@ def classify_intent_deterministic(question: str) -> Optional[Tuple[str, Dict]]:
     if "बिजली" in q or "electricity" in q:
         return "CATEGORY_SPEND", {"category": "utilities"}
 
-    # 5. Total spend intent
+    # 7. Total spend intent
     if any(k in q for k in ["overall", "total spend", "total expense", "total spent", "how much have i spent", "कुल खर्च", "कुल कितना", "खर्चा"]):
         return "TOTAL_SPEND", {}
 
@@ -96,7 +104,7 @@ def classify_question_intent(question: str) -> Tuple[str, Dict]:
     if settings.GEMINI_API_KEY:
         try:
             client = genai.Client(api_key=settings.GEMINI_API_KEY)
-            prompt = f"""You are a question intent classifier for ShopLedger, an expense tracking system for a small shop.
+            prompt = f"""You are a question intent classifier for Vyapar Mitra, an expense tracking system for a small shop.
 Classify the following user query into exactly ONE of the allowed intents:
 - TOTAL_SPEND: queries asking about overall confirmed spending or receipt count
 - CATEGORY_SPEND: queries asking about spending on a specific category (inventory, packaging, transport, utilities, rent, repairs, other)
@@ -136,7 +144,7 @@ def format_money_rupees(amount: float) -> str:
     return f"₹{amount:,.2f}"
 
 
-def execute_question_answer(question: str, lang: str = "en") -> dict:
+def execute_question_answer(question: str, lang: str = "en", owner_id: int = 1) -> dict:
     """Execute fixed safe query in application code, calculate numbers, and format answer."""
     intent, params = classify_question_intent(question)
     is_hi = (lang == "hi")
@@ -153,19 +161,63 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
     answer_text = ""
 
     with get_db() as conn:
-        if intent == "TOTAL_SPEND":
+        if intent == "TOTAL_RECEIVED":
             row = conn.execute(
                 """
                 SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed';
+                WHERE status = 'confirmed' AND transaction_type = 'income';
                 """
             ).fetchone()
             tot = (row["total_paise"] or 0) / 100.0
             cnt = row["count"] or 0
 
             rows = conn.execute(
-                "SELECT id FROM receipts WHERE status = 'confirmed' ORDER BY receipt_date DESC LIMIT 10;"
+                "SELECT id FROM receipts WHERE status = 'confirmed' AND transaction_type = 'income' ORDER BY receipt_date DESC LIMIT 10;"
+            ).fetchall()
+            receipt_ids = [r["id"] for r in rows]
+
+            if is_hi:
+                answer_text = f"आपने {cnt} सत्यापित प्रविष्टियों में कुल {format_money_rupees(tot)} प्राप्त किए हैं।"
+            else:
+                answer_text = f"You have received a total of {format_money_rupees(tot)} across {cnt} confirmed entries."
+
+        elif intent == "TOTAL_BORROWED":
+            row = conn.execute(
+                """
+                SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
+                FROM receipts
+                WHERE status = 'confirmed' AND transaction_type = 'expense';
+                """
+            ).fetchone()
+            tot = (row["total_paise"] or 0) / 100.0
+            cnt = row["count"] or 0
+
+            rows = conn.execute(
+                "SELECT id FROM receipts WHERE status = 'confirmed' AND transaction_type = 'expense' ORDER BY receipt_date DESC LIMIT 10;"
+            ).fetchall()
+            receipt_ids = [r["id"] for r in rows]
+
+            if is_hi:
+                answer_text = f"कुल बाकी उधार / लेन-देन {cnt} प्रविष्टियों में {format_money_rupees(tot)} है।"
+            else:
+                answer_text = f"Total active credit / borrowed items is {format_money_rupees(tot)} across {cnt} entries."
+
+        elif intent == "TOTAL_SPEND":
+            row = conn.execute(
+                """
+                SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
+                FROM receipts
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense';
+                """,
+                (owner_id,),
+            ).fetchone()
+            tot = (row["total_paise"] or 0) / 100.0
+            cnt = row["count"] or 0
+
+            rows = conn.execute(
+                "SELECT id FROM receipts WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense' ORDER BY receipt_date DESC LIMIT 10;",
+                (owner_id,),
             ).fetchall()
             receipt_ids = [r["id"] for r in rows]
 
@@ -182,9 +234,10 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 """
                 SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed' AND LOWER(TRIM(category)) = ?;
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense'
+                  AND LOWER(TRIM(category)) = ?;
                 """,
-                (cat,),
+                (owner_id, cat),
             ).fetchone()
             tot = (row["total_paise"] or 0) / 100.0
             cnt = row["count"] or 0
@@ -192,10 +245,11 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
             rows = conn.execute(
                 """
                 SELECT id FROM receipts
-                WHERE status = 'confirmed' AND LOWER(TRIM(category)) = ?
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense'
+                  AND LOWER(TRIM(category)) = ?
                 ORDER BY receipt_date DESC LIMIT 10;
                 """,
-                (cat,),
+                (owner_id, cat),
             ).fetchall()
             receipt_ids = [r["id"] for r in rows]
 
@@ -209,11 +263,12 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 """
                 SELECT TRIM(vendor) AS vendor_name, COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed' AND TRIM(vendor) != ''
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense' AND TRIM(vendor) != ''
                 GROUP BY TRIM(vendor)
                 ORDER BY total_paise DESC
                 LIMIT 1;
-                """
+                """,
+                (owner_id,),
             ).fetchone()
 
             if row:
@@ -224,10 +279,10 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 rows = conn.execute(
                     """
                     SELECT id FROM receipts
-                    WHERE status = 'confirmed' AND TRIM(vendor) = ?
+                    WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense' AND TRIM(vendor) = ?
                     ORDER BY receipt_date DESC LIMIT 10;
                     """,
-                    (v_name,),
+                    (owner_id, v_name),
                 ).fetchall()
                 receipt_ids = [r["id"] for r in rows]
 
@@ -249,9 +304,10 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 """
                 SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed' AND receipt_date >= ? AND receipt_date <= ?;
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense'
+                  AND receipt_date >= ? AND receipt_date <= ?;
                 """,
-                (start_date, end_date),
+                (owner_id, start_date, end_date),
             ).fetchone()
             tot = (row["total_paise"] or 0) / 100.0
             cnt = row["count"] or 0
@@ -259,10 +315,11 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
             rows = conn.execute(
                 """
                 SELECT id FROM receipts
-                WHERE status = 'confirmed' AND receipt_date >= ? AND receipt_date <= ?
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense'
+                  AND receipt_date >= ? AND receipt_date <= ?
                 ORDER BY receipt_date DESC LIMIT 10;
                 """,
-                (start_date, end_date),
+                (owner_id, start_date, end_date),
             ).fetchall()
             receipt_ids = [r["id"] for r in rows]
 
@@ -276,17 +333,19 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 """
                 SELECT COUNT(*) AS count
                 FROM receipts
-                WHERE status != 'confirmed' AND status != 'discarded_duplicate';
-                """
+                WHERE owner_id = ? AND status != 'confirmed' AND status != 'discarded_duplicate';
+                """,
+                (owner_id,),
             ).fetchone()
             cnt = row["count"] or 0
 
             rows = conn.execute(
                 """
                 SELECT id FROM receipts
-                WHERE status != 'confirmed' AND status != 'discarded_duplicate'
+                WHERE owner_id = ? AND status != 'confirmed' AND status != 'discarded_duplicate'
                 ORDER BY created_at DESC LIMIT 10;
-                """
+                """,
+                (owner_id,),
             ).fetchall()
             receipt_ids = [r["id"] for r in rows]
 
@@ -296,7 +355,7 @@ def execute_question_answer(question: str, lang: str = "en") -> dict:
                 answer_text = f"समीक्षा के लिए {cnt} रसीद(ें) बाकी हैं।" if is_hi else f"You have {cnt} receipt(s) waiting for your review."
 
     # Fetch receipt details for evidence
-    evidence_receipts = [get_receipt_details(rid) for rid in receipt_ids]
+    evidence_receipts = [get_receipt_details(rid, owner_id) for rid in receipt_ids]
 
     return {
         "answer": answer_text,

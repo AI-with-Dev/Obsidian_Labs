@@ -1,1 +1,1 @@
-"""ShopLedger Backend Application Package."""
+"""Vyapar Mitra Backend Application Package."""

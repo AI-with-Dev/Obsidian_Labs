@@ -13,7 +13,7 @@ async function call<T>(path:string,init:RequestInit|undefined,mock:()=>T):Promis
   const body=init?.body
   const res=await fetch((BASE||'')+path,{...init,credentials:'include',headers:body instanceof FormData?{}:{'Content-Type':'application/json'}})
   if(res.status===401&&path!=='/api/auth/status'&&path!=='/api/auth/login'){
-    window.dispatchEvent(new Event('shopledger:unauthorized'))
+    window.dispatchEvent(new Event('vyapar-mitra:unauthorized'))
   }
   const j=await res.json().catch(()=>null)
   if(!res.ok||!j?.success)throw new Error(j?.error?.message??j?.error??'Request failed')
@@ -55,6 +55,8 @@ export const save=(r:Receipt)=>call<Receipt>(`/api/receipts/${r.id}`,json('PATCH
   items:r.items,
   total:r.total,
   category:r.category,
+  type:r.type,
+  transactionType:r.type,
   invoiceNumber:r.invoiceNumber,
   subtotal:r.subtotal,
   tax:r.tax,
@@ -65,6 +67,7 @@ export const save=(r:Receipt)=>call<Receipt>(`/api/receipts/${r.id}`,json('PATCH
 }),()=>m.save(r))
 export const confirm=(id:string)=>call<Receipt>(`/api/receipts/${id}/confirm`,json('POST'),()=>m.confirm(id))
 export const discard=(id:string)=>call<void>(`/api/receipts/${id}/discard-duplicate`,json('POST'),()=>m.discard(id))
+export const deleteReceipt=(id:string)=>call<void>(`/api/receipts/${id}`,json('DELETE'),()=>m.deleteReceipt(id))
 export const keepSeparate=(id:string)=>call<Receipt>(`/api/receipts/${id}/keep-separate`,json('POST'),()=>m.keep(id))
 export const voiceQuickEntry=(payload:{spoken_text:string;amount:number;vendor?:string;category?:string;data?:string})=>
   call<Receipt>('/api/receipts/voice-quick-entry',json('POST',payload),()=>m.voiceQuickEntry(payload))
@@ -77,7 +80,7 @@ export async function exportPdf(){
   let blob:Blob
   if(!MOCK){
     const r=await fetch((BASE||'')+'/api/export/pdf',{credentials:'include'})
-    if(r.status===401)window.dispatchEvent(new Event('shopledger:unauthorized'))
+    if(r.status===401)window.dispatchEvent(new Event('vyapar-mitra:unauthorized'))
     if(!r.ok) throw new Error('PDF export failed')
     blob=await r.blob()
   } else {
@@ -86,7 +89,7 @@ export async function exportPdf(){
   }
   const a=document.createElement('a')
   a.href=URL.createObjectURL(blob)
-  a.download='shopledger-payment-summary.pdf'
+  a.download='vyapar-mitra-payment-summary.pdf'
   a.click()
   window.setTimeout(()=>URL.revokeObjectURL(a.href),1000)
 }
@@ -94,13 +97,13 @@ export async function exportPdf(){
 export async function exportCsv(){
   if(MOCK)throw new Error('CSV export requires the backend API.')
   const response=await fetch((BASE||'')+'/api/export/csv',{credentials:'include'})
-  if(response.status===401)window.dispatchEvent(new Event('shopledger:unauthorized'))
+  if(response.status===401)window.dispatchEvent(new Event('vyapar-mitra:unauthorized'))
   if(!response.ok)throw new Error('CSV export failed')
   const blob=await response.blob()
   const url=URL.createObjectURL(blob)
   const link=document.createElement('a')
   link.href=url
-  link.download='shopledger-ledger.csv'
+  link.download='vyapar-mitra-ledger.csv'
   link.click()
   window.setTimeout(()=>URL.revokeObjectURL(url),1000)
 }

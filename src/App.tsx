@@ -5,6 +5,7 @@ import {Account} from './api'
 import {AuthPage,SettingsPage} from './account'
 import {CATEGORIES,Receipt,Item,Filters,Answer} from './types'
 import { parseSpokenHindiAudio } from './hindiSpeechParser'
+import {VyaparMitraLogo} from './components/VyaparMitraLogo'
 
 // Reusable SVG Icons for clear, simple visual guidance
 function StoreIcon({className="w-5 h-5"}:{className?:string}){
@@ -59,26 +60,15 @@ function CameraIcon({className="w-5 h-5"}:{className?:string}){
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
 }
 
-// Design system tokens matching the warm cream & emerald green theme with crisp, sharp edges
-const btn = 'min-h-[46px] px-5 sm:px-6 rounded-xs text-base font-semibold focus-visible:outline-2 focus-visible:outline-emerald-500 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
-const primary = `${btn} bg-emerald-700 text-white hover:bg-emerald-800 shadow-2xs`
-const prominentBtn = `${btn} bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs text-base sm:text-lg font-bold py-3.5`
-const ghost = `${btn} border border-stone-300 text-stone-800 bg-white hover:bg-stone-50 hover:border-emerald-700/40 shadow-2xs`
-const field = 'w-full min-h-[46px] px-3.5 sm:px-4 rounded-xs border border-stone-300 bg-white text-base text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:bg-stone-100 disabled:text-stone-500 transition-all'
-const card = 'block rounded-xs bg-white border border-stone-200/90 shadow-2xs hover:shadow-xs transition-all p-5 sm:p-6'
+// Design system tokens: high-contrast, large touch targets tailored for budget mobile screens in direct sunlight
+const btn = 'min-h-[48px] px-5 sm:px-6 rounded-xl text-base font-bold focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all cursor-pointer select-none active:scale-[0.99]'
+const primary = `${btn} bg-emerald-700 text-white hover:bg-emerald-800 shadow-sm`
+const prominentBtn = `${btn} min-h-[54px] sm:min-h-[58px] bg-emerald-700 text-white hover:bg-emerald-800 shadow-md text-lg sm:text-xl font-black py-3.5`
+const ghost = `${btn} border-2 border-stone-300 text-stone-800 bg-white hover:bg-stone-50 hover:border-emerald-700/60 shadow-2xs`
+const field = 'w-full min-h-[48px] sm:min-h-[50px] px-3.5 sm:px-4 rounded-xl border-2 border-stone-300 bg-white text-base font-semibold text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 disabled:bg-stone-100 disabled:text-stone-500 transition-all placeholder:text-stone-400'
+const card = 'block rounded-2xl bg-white border-2 border-stone-200/90 shadow-2xs hover:shadow-xs transition-all p-5 sm:p-6'
 const h1 = 'text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 mb-1'
 const h2 = 'text-xl sm:text-2xl font-bold tracking-tight text-stone-900 mb-4'
-
-// Subtle category pill colors for easy recognition
-const catColors: Record<string, string> = {
-  inventory: 'bg-emerald-50 text-emerald-800 border-emerald-200/70',
-  packaging: 'bg-amber-50 text-amber-800 border-amber-200/70',
-  transport: 'bg-blue-50 text-blue-800 border-blue-200/70',
-  utilities: 'bg-teal-50 text-teal-800 border-teal-200/70',
-  rent: 'bg-purple-50 text-purple-800 border-purple-200/70',
-  repairs: 'bg-rose-50 text-rose-800 border-rose-200/70',
-  other: 'bg-stone-100 text-stone-700 border-stone-200/70',
-}
 
 const OK = ['image/jpeg', 'image/png', 'application/pdf']
 
@@ -160,85 +150,59 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
   )
   return (
     <ul className="space-y-3">
-      {rs.map(r => (
-        <li key={r.id}>
-          <div
-            onClick={() => onSelect ? onSelect(r) : location.hash = `#/receipt/${r.id}`}
-            role="button"
-            tabIndex={0}
-            className={`${card} flex flex-wrap items-center justify-between gap-3 hover:border-emerald-700/60 hover:shadow-md transition-all group cursor-pointer`}
-          >
-            <div className="flex items-center gap-3.5 min-w-[200px]">
-              <div className="w-11 h-11 rounded-xs bg-stone-100 group-hover:bg-emerald-50 text-stone-600 group-hover:text-emerald-700 flex items-center justify-center transition-colors shrink-0">
-                <ReceiptIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <b className="block text-base sm:text-lg text-stone-900 group-hover:text-emerald-900 transition-colors">
-                  {r.vendor || '—'}
-                </b>
-                <div className="flex items-center flex-wrap gap-2 text-sm text-stone-500 mt-0.5">
-                  <span>{r.date ? day(r.date, lang) : '—'}</span>
-                  <span>•</span>
-                  <span className={`px-2 py-0.5 rounded-xs text-xs font-medium border ${catColors[r.category] || catColors.other}`}>
-                    {t('cat.' + r.category)}
-                  </span>
-                  {r.data && (
-                    <span className="px-2 py-0.5 rounded-xs text-xs font-medium bg-emerald-50 text-emerald-900 border border-emerald-300/80 flex items-center gap-1 max-w-[260px] truncate" title={r.data}>
-                      <span className="shrink-0 font-bold text-emerald-700">🎙️ {t('voice.dataTag')}:</span>
-                      <span className="truncate">{r.data.replace(/^Spoken:\s*/i, '')}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="text-right flex items-center gap-3 ml-auto">
-              <div>
-                <b className={`block text-lg sm:text-xl font-bold ${r.type === 'income' ? 'text-emerald-700' : 'text-rose-600'}`}>
-                  {r.total == null ? '—' : `${r.type === 'income' ? '+' : '-'} ${money(r.total, lang, r.currency)}`}
-                </b>
-                <div className="mt-0.5">
-                  <Badge s={r.status} />
-                </div>
-              </div>
-              <div className="text-stone-400 group-hover:text-emerald-700 transition-colors hidden sm:block">
-                <ArrowRightIcon className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function CategoryBreakdown({ rows, total }: { rows: { label: string; amount: number; href: string }[]; total: number }){
-  const { lang,currency } = useI18n()
-  if (!rows.length) return null
-  return (
-    <div className="space-y-2.5">
-      {rows.map(r => {
-        const pct = total > 0 ? Math.round((r.amount / total) * 100) : 0
+      {rs.map(r => {
+        const isBorrowed = r.type === 'expense'
         return (
-          <a
-            key={r.label}
-            href={r.href}
-            className={`${card} p-4 sm:p-5 hover:border-emerald-700/50 hover:shadow-sm transition-all group block`}
-          >
-            <div className="flex justify-between items-center gap-2 mb-2 text-base">
-              <span className="font-semibold text-stone-800 group-hover:text-emerald-800 transition-colors">{r.label}</span>
-              <span className="font-bold text-stone-900">{money(r.amount, lang,currency)}</span>
+          <li key={r.id}>
+            <div
+              onClick={() => onSelect ? onSelect(r) : location.hash = `#/receipt/${r.id}`}
+              role="button"
+              tabIndex={0}
+              className={`${card} flex flex-wrap items-center justify-between gap-3 hover:border-emerald-700/60 hover:shadow-md transition-all group cursor-pointer`}
+            >
+              <div className="flex items-center gap-3.5 min-w-[200px]">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
+                  isBorrowed ? 'bg-amber-50 text-amber-800 group-hover:bg-amber-100' : 'bg-emerald-50 text-emerald-800 group-hover:bg-emerald-100'
+                }`}>
+                  {isBorrowed ? <ClockIcon className="w-5 h-5" /> : <WalletIcon className="w-5 h-5" />}
+                </div>
+                <div>
+                  <b className="block text-base sm:text-lg text-stone-900 group-hover:text-emerald-900 transition-colors">
+                    {r.vendor || '—'}
+                  </b>
+                  <div className="flex items-center flex-wrap gap-2 text-sm text-stone-500 mt-0.5">
+                    <span>{r.date ? day(r.date, lang) : '—'}</span>
+                    {r.data && (
+                      <span className="truncate max-w-[260px]" title={r.data}>
+                        🎙️ {r.data.replace(/^Spoken:\s*/i, '')}
+                      </span>
+                    )}
+                    <span className={`inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.2 text-[11px] font-bold ${
+                      isBorrowed ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                    }`}>
+                      {isBorrowed ? t('type.borrowed') : t('type.income')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right flex items-center gap-3 ml-auto">
+                <div>
+                  <b className={`block text-lg sm:text-xl font-black ${isBorrowed ? 'text-amber-800' : 'text-emerald-700'}`}>
+                    {r.total == null ? '—' : (isBorrowed ? `उधार ${money(r.total, lang, r.currency)}` : `+ ${money(r.total, lang, r.currency)}`)}
+                  </b>
+                  <div className="mt-0.5">
+                    <Badge s={r.status} />
+                  </div>
+                </div>
+                <div className="text-stone-400 group-hover:text-emerald-700 transition-colors hidden sm:block">
+                  <ArrowRightIcon className="w-5 h-5" />
+                </div>
+              </div>
             </div>
-            <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-emerald-600 group-hover:bg-emerald-700 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(pct, 100)}%` }}
-              />
-            </div>
-            <span className="text-xs text-stone-500 mt-1 block">{pct}% of total</span>
-          </a>
+          </li>
         )
       })}
-    </div>
+    </ul>
   )
 }
 
@@ -275,9 +239,10 @@ interface ReviewModalProps {
   file?: File | null
   onClose: () => void
   onSuccess: (receipt: Receipt) => void
+  onDeleted: () => void
 }
 
-function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModalProps){
+function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: ReviewModalProps){
   const { t, lang } = useI18n()
 
   const [loading, setLoading] = useState(true)
@@ -285,42 +250,31 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
   const [initError, setInitError] = useState<string | null>(null)
 
   const [receipt, setReceipt] = useState<Receipt | null>(null)
+  const [transactionType, setTransactionType] = useState<'income' | 'expense'>('income')
   const [vendor, setVendor] = useState('')
-  const [invoiceNo, setInvoiceNo] = useState('')
   const [date, setDate] = useState('')
-  const [category, setCategory] = useState('inventory')
-  const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [currency, setCurrency] = useState('INR')
   const [items, setItems] = useState<Item[]>([])
-  const [tax, setTax] = useState<string>('')
-  const [discount, setDiscount] = useState<string>('')
   const [total, setTotal] = useState<string>('')
-  const [notes, setNotes] = useState('')
 
   const [showImage, setShowImage] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [dupResolving, setDupResolving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  // Populate form fields from extracted/loaded receipt
+  // Populate form fields with essential everyday details
   const populate = (r: Receipt) => {
     setReceipt(r)
+    setTransactionType(r.type === 'expense' ? 'expense' : 'income')
     setVendor(r.vendor || '')
-    setInvoiceNo(r.invoiceNumber || '')
     setDate(r.date || '')
-    setCategory(r.category || 'inventory')
-    setPaymentMethod(r.paymentMethod || 'Cash')
     setCurrency(r.currency || 'INR')
     setItems(r.items && r.items.length ? r.items.map(it => ({
       name: it.name || '',
       amount: it.amount || 0,
-      quantity: it.quantity || 1,
-      unitPrice: it.unitPrice || it.amount || 0,
-    })) : [{ name: '', amount: 0, quantity: 1, unitPrice: 0 }])
-    setTax(r.tax !== undefined && r.tax !== null ? String(r.tax) : '')
-    setDiscount(r.discount !== undefined && r.discount !== null ? String(r.discount) : '')
+    })) : [{ name: '', amount: 0 }])
     setTotal(r.total !== null && r.total !== undefined ? String(r.total) : '')
-    setNotes(r.notes || '')
   }
 
   // Initial fetch / OCR process
@@ -364,39 +318,31 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
   }, [file, receiptId])
 
   // Subtotal calculation
-  const subtotal = items.reduce((acc, it) => acc + (Number(it.amount) || 0), 0)
-
-  // Item field update with auto-calculation of line amount if qty/price edited
+  // Item field update
   const updateItem = (index: number, patch: Partial<Item>) => {
     setItems(prev => {
       const copy = [...prev]
-      const current = { ...copy[index], ...patch }
-      if (patch.quantity !== undefined || patch.unitPrice !== undefined) {
-        const q = Number(current.quantity) || 1
-        const p = Number(current.unitPrice) || 0
-        if (p > 0) {
-          current.amount = Math.round(q * p * 100) / 100
-        }
-      }
-      copy[index] = current
+      copy[index] = { ...copy[index], ...patch }
       return copy
     })
   }
 
   const addItem = () => {
-    setItems(prev => [...prev, { name: '', amount: 0, quantity: 1, unitPrice: 0 }])
+    setItems(prev => [...prev, { name: '', amount: 0 }])
   }
 
   const removeItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Recalculate suggested total when items, tax, or discount change
+  // Calculate items sum
+  const itemsTotal = items.reduce((acc, it) => acc + (Number(it.amount) || 0), 0)
+
+  // Auto-fill total from items sum if desired
   const applyCalculatedTotal = () => {
-    const tVal = Number(tax) || 0
-    const dVal = Number(discount) || 0
-    const calc = Math.max(0, subtotal + tVal - dVal)
-    setTotal(String(Math.round(calc * 100) / 100))
+    if (itemsTotal > 0) {
+      setTotal(String(Math.round(itemsTotal * 100) / 100))
+    }
   }
 
   // Handle duplicate decision: Keep as separate
@@ -427,6 +373,21 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
     }
   }
 
+  const handleDeleteReceipt = async () => {
+    if (!receipt || !receiptId || isDeleting) return
+    if (!window.confirm(t('rv.deleteConfirm'))) return
+
+    setIsDeleting(true)
+    setSubmitError(null)
+    try {
+      await api.deleteReceipt(receipt.id)
+      onDeleted()
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : t('common.error'))
+      setIsDeleting(false)
+    }
+  }
+
   // Final Validation and Save & Confirm
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -434,7 +395,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
 
     setSubmitError(null)
 
-    // Validation
+    // Validation: simple essential merchant details
     const trimmedVendor = vendor.trim()
     const trimmedDate = date.trim()
     const numericTotal = total === '' ? null : Number(total)
@@ -447,28 +408,21 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
     setIsSubmitting(true)
 
     try {
-      // 1. Prepare finalized receipt payload using user's edited values
+      // 1. Prepare finalized receipt payload using essential details
       const finalized: Receipt = {
         ...receipt,
         vendor: trimmedVendor,
         date: trimmedDate,
         currency: currency || 'INR',
-        category: category || 'inventory',
+        type: transactionType,
+        category: receipt?.category || 'other',
         items: items
           .map(it => ({
             name: it.name.trim() || 'Item',
             amount: Number(it.amount) || 0,
-            quantity: Number(it.quantity) || 1,
-            unitPrice: Number(it.unitPrice) || Number(it.amount) || 0,
           }))
           .filter(it => it.name.length > 0 || it.amount > 0),
         total: numericTotal,
-        invoiceNumber: invoiceNo.trim() || undefined,
-        subtotal,
-        tax: tax !== '' ? Number(tax) : undefined,
-        discount: discount !== '' ? Number(discount) : undefined,
-        paymentMethod: paymentMethod || undefined,
-        notes: notes.trim() || undefined,
         status: 'confirmed',
         flags: [],
       }
@@ -511,23 +465,41 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
                 {t('rv.title')}
               </h2>
               <p className="text-xs text-stone-500">
-                {receipt?.fileName || file?.name || 'ShopLedger'}
+                {receipt?.fileName || file?.name || 'Vyapar Mitra'}
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            className="w-9 h-9 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-900 hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer"
-            onClick={onClose}
-            disabled={isSubmitting}
-            aria-label={t('rv.close')}
-          >
-            <XIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {receiptId && receipt && (
+              <button
+                type="button"
+                className="min-h-[38px] px-3 rounded-xs border border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                onClick={() => void handleDeleteReceipt()}
+                disabled={isDeleting || isSubmitting}
+              >
+                {isDeleting ? t('rv.deleting') : t('rv.delete')}
+              </button>
+            )}
+            <button
+              type="button"
+              className="w-9 h-9 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-900 hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+              onClick={onClose}
+              disabled={isSubmitting || isDeleting}
+              aria-label={t('rv.close')}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Content */}
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
+          {submitError && (
+            <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-rose-900 text-sm font-semibold flex items-center gap-2">
+              <span>⚠</span>
+              <span>{submitError}</span>
+            </div>
+          )}
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-stone-600">
               <div className="w-10 h-10 border-3 border-emerald-700 border-t-transparent rounded-full animate-spin" />
@@ -620,107 +592,90 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
                 <span>{t('rv.warn')}</span>
               </div>
 
-              {/* 1. RECEIPT DETAILS SECTION */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500 border-b border-stone-200 pb-1">
-                  1. {t('rv.details')}
-                </h3>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.vendor')} <span className="text-rose-600">*</span>
-                      </span>
-                      <input
-                        type="text"
-                        className={field}
-                        placeholder="e.g. Sharma Traders"
-                        value={vendor}
-                        onChange={e => setVendor(e.target.value)}
-                        required
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.invoiceNo')}
-                      </span>
-                      <input
-                        type="text"
-                        className={field}
-                        placeholder="e.g. INV-1049"
-                        value={invoiceNo}
-                        onChange={e => setInvoiceNo(e.target.value)}
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.date')} <span className="text-rose-600">*</span>
-                      </span>
-                      <input
-                        type="date"
-                        className={field}
-                        value={date}
-                        onChange={e => setDate(e.target.value)}
-                        required
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.category')}
-                      </span>
-                      <select
-                        className={field}
-                        value={category}
-                        onChange={e => setCategory(e.target.value)}
-                      >
-                        {CATEGORIES.map(c => (
-                          <option key={c} value={c}>
-                            {t('cat.' + c)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-stone-800">
-                        {t('rv.paymentMethod')}
-                      </span>
-                      <select
-                        className={field}
-                        value={paymentMethod}
-                        onChange={e => setPaymentMethod(e.target.value)}
-                      >
-                        <option value="Cash">{t('rv.cash')}</option>
-                        <option value="UPI">{t('rv.upi')}</option>
-                        <option value="Card">{t('rv.card')}</option>
-                        <option value="Credit">{t('rv.credit')}</option>
-                      </select>
-                    </label>
-                  </div>
+              {/* Transaction Type: Money Received vs. Borrowed Items / Credit */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-2.5">
+                <span className="block text-xs sm:text-sm font-extrabold uppercase tracking-wider text-stone-800">
+                  {t('rv.typeLabel')} <span className="text-emerald-700 font-black">*</span>
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setTransactionType('income')}
+                    className={`min-h-[50px] px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm md:text-base flex items-center justify-center gap-2 transition-all cursor-pointer border-2 select-none active:scale-[0.99] ${
+                      transactionType === 'income'
+                        ? 'bg-emerald-700 border-emerald-800 text-white shadow-sm ring-2 ring-emerald-600/30'
+                        : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100 hover:border-emerald-700/40'
+                    }`}
+                  >
+                    <WalletIcon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                    <span className="truncate">{t('rv.typeIncome')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransactionType('expense')}
+                    className={`min-h-[50px] px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm md:text-base flex items-center justify-center gap-2 transition-all cursor-pointer border-2 select-none active:scale-[0.99] ${
+                      transactionType === 'expense'
+                        ? 'bg-amber-700 border-amber-800 text-white shadow-sm ring-2 ring-amber-600/30'
+                        : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100 hover:border-amber-700/40'
+                    }`}
+                  >
+                    <ClockIcon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                    <span className="truncate">{t('rv.typeExpense')}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* 2. ITEMS SECTION */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-stone-200 pb-1">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500">
-                    2. {t('rv.itemsSection')}
+              {/* 1. Essential Ledger Entry: Party/Person Name, Date */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-3.5">
+                <div className="border-b border-stone-200 pb-2">
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                    <StoreIcon className="w-4 h-4 text-emerald-700" />
+                    {t('rv.details')}
+                  </h3>
+                </div>
+
+                <div>
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center justify-between text-sm sm:text-base font-bold text-stone-900">
+                      <span>{t('rv.vendor')} <span className="text-emerald-700 font-black">*</span></span>
+                    </span>
+                    <input
+                      type="text"
+                      className={field}
+                      placeholder={lang === 'hi' ? 'उदा. रमेश, सुरेश भाई' : 'e.g. Ramesh, Suresh bhai'}
+                      value={vendor}
+                      onChange={e => setVendor(e.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
+                      {t('rv.date')} <span className="text-emerald-700 font-black">*</span>
+                    </span>
+                    <input
+                      type="date"
+                      className={field}
+                      value={date}
+                      onChange={e => setDate(e.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* 2. Items & Goods Description */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                    <ReceiptIcon className="w-4 h-4 text-emerald-700" />
+                    {t('rv.itemsSection')}
                   </h3>
                   <button
                     type="button"
-                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                    className="text-xs sm:text-sm font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer px-2.5 py-1 rounded-lg hover:bg-emerald-50 transition-colors"
                     onClick={addItem}
                   >
                     {t('rv.addItem')}
@@ -729,171 +684,88 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
 
                 <div className="space-y-2.5">
                   {items.map((it, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded-xl border border-stone-200/90 shadow-2xs space-y-2">
-                      <div className="flex items-center gap-2">
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        className={`${field} flex-1 text-sm sm:text-base`}
+                        placeholder={t('rv.item')}
+                        value={it.name}
+                        onChange={e => updateItem(idx, { name: e.target.value })}
+                      />
+                      <div className="w-28 sm:w-36 shrink-0 relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-stone-400">₹</span>
                         <input
-                          type="text"
-                          className={`${field} flex-1`}
-                          placeholder={t('rv.item')}
-                          value={it.name}
-                          onChange={e => updateItem(idx, { name: e.target.value })}
+                          type="number"
+                          inputMode="decimal"
+                          step="any"
+                          min="0"
+                          placeholder="0.00"
+                          className={`${field} pl-6 text-sm sm:text-base font-bold text-stone-900`}
+                          value={it.amount || ''}
+                          onChange={e => updateItem(idx, { amount: Number(e.target.value) || 0 })}
                         />
+                      </div>
+                      {items.length > 1 && (
                         <button
                           type="button"
-                          className="w-9 h-9 rounded-xl text-stone-400 hover:text-rose-700 hover:bg-rose-50 flex items-center justify-center shrink-0 transition-colors"
+                          className="w-10 h-10 rounded-xl text-stone-400 hover:text-rose-700 hover:bg-rose-50 flex items-center justify-center shrink-0 transition-colors font-bold text-base cursor-pointer"
                           onClick={() => removeItem(idx)}
                           aria-label={t('rv.removeItem')}
                         >
                           ✕
                         </button>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div>
-                          <label className="block text-stone-500 mb-0.5">{t('rv.qty')}</label>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="any"
-                            min="0"
-                            className={`${field} min-h-[38px] text-sm px-2`}
-                            value={it.quantity ?? 1}
-                            onChange={e => updateItem(idx, { quantity: Number(e.target.value) })}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-stone-500 mb-0.5">{t('rv.price')} (₹)</label>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="any"
-                            min="0"
-                            className={`${field} min-h-[38px] text-sm px-2`}
-                            value={it.unitPrice ?? it.amount ?? 0}
-                            onChange={e => updateItem(idx, { unitPrice: Number(e.target.value) })}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-stone-500 mb-0.5">{t('rv.amount')} (₹)</label>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="any"
-                            min="0"
-                            className={`${field} min-h-[38px] text-sm px-2 font-bold text-stone-900`}
-                            value={it.amount}
-                            onChange={e => updateItem(idx, { amount: Number(e.target.value) })}
-                          />
-                        </div>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* 3. AMOUNT SUMMARY SECTION */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-stone-200 pb-1">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500">
-                    3. {t('rv.summary')}
-                  </h3>
-                  <button
-                    type="button"
-                    className="text-xs text-stone-500 hover:text-stone-800 underline"
-                    onClick={applyCalculatedTotal}
-                  >
-                    {t('rv.autoFill')}
-                  </button>
+              {/* 3. High-Contrast Prominent Total Card */}
+              <div className="bg-emerald-50/85 rounded-2xl border-2 border-emerald-600/90 p-4 sm:p-5 shadow-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="receipt-total-input" className="text-sm sm:text-base font-extrabold uppercase tracking-wide text-emerald-950 flex items-center gap-1.5">
+                    <WalletIcon className="w-5 h-5 text-emerald-800" />
+                    <span>{t('rv.total')} <span className="text-rose-600">*</span></span>
+                  </label>
+                  {itemsTotal > 0 && (
+                    <button
+                      type="button"
+                      onClick={applyCalculatedTotal}
+                      className="text-xs sm:text-sm font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
+                    >
+                      {t('rv.autoFill')} (₹{itemsTotal.toLocaleString('en-IN')})
+                    </button>
+                  )}
                 </div>
 
-                <div className="bg-white p-4 rounded-2xl border border-stone-200/90 space-y-3">
-                  <div className="flex justify-between items-center text-sm text-stone-600">
-                    <span>{t('rv.subtotal')}:</span>
-                    <span className="font-semibold text-stone-800">{money(subtotal, lang, currency)}</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-stone-600 mb-1">{t('rv.tax')} (₹)</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        placeholder="0.00"
-                        className={`${field} min-h-[42px] text-sm`}
-                        value={tax}
-                        onChange={e => setTax(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-stone-600 mb-1">{t('rv.discount')} (₹)</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        placeholder="0.00"
-                        className={`${field} min-h-[42px] text-sm`}
-                        value={discount}
-                        onChange={e => setDiscount(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-stone-100">
-                    <label className="block">
-                      <span className="mb-1 flex items-center justify-between text-base font-bold text-stone-900">
-                        <span>{t('rv.total')} (₹) <span className="text-rose-600">*</span></span>
-                        <span className="text-xs font-normal text-stone-500">Required</span>
-                      </span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        className={`${field} text-xl font-extrabold text-emerald-950 border-emerald-600/50 focus:border-emerald-700 bg-emerald-50/20`}
-                        placeholder="0.00"
-                        value={total}
-                        onChange={e => setTotal(e.target.value)}
-                        required
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-stone-600">{t('rv.notes')}</span>
-                      <input
-                        type="text"
-                        className={`${field} min-h-[42px] text-sm`}
-                        placeholder="Optional remarks (e.g. Paid by cashier)"
-                        value={notes}
-                        onChange={e => setNotes(e.target.value)}
-                      />
-                    </label>
-                  </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-2xl font-black text-emerald-700">₹</span>
+                  <input
+                    id="receipt-total-input"
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="0"
+                    className="w-full min-h-[56px] sm:min-h-[60px] pl-9 pr-4 rounded-xl border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/30 text-2xl sm:text-3xl font-black text-emerald-950 bg-white shadow-inner"
+                    placeholder="0.00"
+                    value={total}
+                    onChange={e => setTotal(e.target.value)}
+                    required
+                  />
                 </div>
               </div>
 
-              {/* Inline Error Notice */}
-              {submitError && (
-                <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-rose-900 text-sm font-semibold flex items-center gap-2">
-                  <span>⚠</span>
-                  <span>{submitError}</span>
-                </div>
-              )}
             </form>
           )}
         </div>
 
-        {/* Modal Footer / Prominent Add Receipt Button */}
+        {/* Modal Footer / Large Touch-Friendly Save & Confirm Button */}
         {!loading && !initError && receipt?.status !== 'duplicate' && (
-          <div className="p-4 sm:p-5 border-t border-stone-200/80 bg-white space-y-2">
+          <div className="p-4 sm:p-5 border-t border-stone-200/80 bg-white space-y-2.5">
             <button
               type="submit"
               form="review-receipt-form"
-              className={`${prominentBtn} w-full`}
+              className="w-full min-h-[54px] sm:min-h-[58px] bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-lg sm:text-xl font-black rounded-xl shadow-md flex items-center justify-center gap-2.5 cursor-pointer transition-all active:scale-[0.99] disabled:opacity-50"
               disabled={isSubmitting}
             >
               {isSubmitting ? (
@@ -903,7 +775,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
                 </>
               ) : (
                 <>
-                  <CheckCircleIcon className="w-5 h-5" />
+                  <CheckCircleIcon className="w-6 h-6 text-emerald-200" />
                   <span>{t('rv.addReceipt')}</span>
                 </>
               )}
@@ -911,7 +783,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess }: ReviewModal
             <div className="text-center">
               <button
                 type="button"
-                className="text-xs text-stone-500 hover:text-stone-800 underline py-1"
+                className="text-xs sm:text-sm font-semibold text-stone-500 hover:text-stone-800 underline py-1.5 cursor-pointer"
                 disabled={isSubmitting}
                 onClick={onClose}
               >
@@ -1472,15 +1344,14 @@ function Home({ onAddReceipt, onOpenVoice, onSelectReceipt, refreshKey }: { onAd
   const { t, lang,currency } = useI18n()
   const q = useLoad(() => Promise.all([
     api.summary(),
-    api.categories(),
     api.list({ status: 'pending' }),
     api.list({ status: 'confirmed' })
   ]), [refreshKey])
-  const s = q.d?.[0], c = q.d?.[1], p = q.d?.[2], confirmed = q.d?.[3]
+  const s = q.d?.[0], p = q.d?.[1], confirmed = q.d?.[2]
 
   return (
     <State {...q}>
-      {s && c && p && (
+      {s && p && (
         <div className="space-y-8">
           {/* Welcoming Dashboard Greeting & Action Buttons */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1523,83 +1394,109 @@ function Home({ onAddReceipt, onOpenVoice, onSelectReceipt, refreshKey }: { onAd
             </div>
           )}
 
-          {/* Key Stat Cards: 1 Prominent Dark-Green Card + 2 Smaller Cards */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            {/* Prominent Dark-Green Card Showing Total Received */}
-            <div className="sm:col-span-1 rounded-xs p-6 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white shadow-md shadow-emerald-950/20 border border-emerald-800/40 flex flex-col justify-between relative overflow-hidden">
+          {/* Key Stat Cards: 2 Prominent Pillar Cards (Money Received & Borrowed Items) + Support Stats */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Pillar 1: Total Money Received (Green Card) */}
+            <div className="rounded-2xl p-6 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white shadow-md shadow-emerald-950/20 border-2 border-emerald-700/60 flex flex-col justify-between relative overflow-hidden">
               <div className="relative z-10">
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="w-10 h-10 rounded-xs bg-emerald-800/80 border border-emerald-600/40 text-emerald-200 flex items-center justify-center">
+                  <span className="w-10 h-10 rounded-xl bg-emerald-800/90 border border-emerald-600/50 text-emerald-200 flex items-center justify-center">
                     <WalletIcon className="w-5 h-5" />
                   </span>
-                  <span className="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-xs bg-emerald-800/90 text-emerald-200 border border-emerald-700/50">
-                    {t('home.verifiedBadge')}
+                  <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-emerald-800/90 text-emerald-200 border border-emerald-700/60">
+                    {t('type.income')}
                   </span>
                 </div>
-                <p className="text-emerald-200/90 text-sm font-medium">
-                  {t('home.spent')}
+                <p className="text-emerald-200 text-sm font-semibold">
+                  {t('home.received')}
                 </p>
-                <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5">
-                  {money(s.totalSpent ?? s.totalReceived ?? 0, lang, currency)}
+                <p className="text-3xl sm:text-4xl font-black tracking-tight text-white mt-1.5">
+                  {money(s.totalReceived ?? 0, lang, currency)}
+                </p>
+                <p className="text-xs text-emerald-300/80 mt-1">
+                  {t('home.receivedSub')}
                 </p>
               </div>
-              <div className="relative z-10 pt-4 mt-2 border-t border-emerald-800/50 flex items-center justify-between text-xs text-emerald-200/80">
+              <div className="relative z-10 pt-4 mt-3 border-t border-emerald-800/60 flex items-center text-xs text-emerald-200/90 font-medium">
                 <span>{s.confirmedCount} {t('home.count').toLowerCase()}</span>
-                <a href="#/ledger" className="underline hover:text-white transition-colors">
-                  {t('home.allConfirmed')} →
-                </a>
               </div>
             </div>
 
-            {/* Smaller Card 1: Confirmed Receipts */}
+            {/* Pillar 2: Total Active Credit / Borrowed Items (Amber Card) */}
+            <div className="rounded-2xl p-6 bg-gradient-to-br from-stone-900 via-amber-950 to-stone-950 text-white shadow-md shadow-amber-950/20 border-2 border-amber-600/70 flex flex-col justify-between relative overflow-hidden">
+              <div className="relative z-10">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="w-10 h-10 rounded-xl bg-amber-900/90 border border-amber-600/50 text-amber-200 flex items-center justify-center">
+                    <ClockIcon className="w-5 h-5" />
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-amber-900/90 text-amber-200 border border-amber-700/60">
+                    {t('type.borrowed')}
+                  </span>
+                </div>
+                <p className="text-amber-200 text-sm font-semibold">
+                  {t('home.borrowed')}
+                </p>
+                <p className="text-3xl sm:text-4xl font-black tracking-tight text-amber-100 mt-1.5">
+                  {money(s.totalBorrowed ?? s.totalSpent ?? 0, lang, currency)}
+                </p>
+                <p className="text-xs text-amber-300/80 mt-1">
+                  {t('home.borrowedSub')}
+                </p>
+              </div>
+              <div className="relative z-10 pt-4 mt-3 border-t border-amber-800/60 flex items-center text-xs text-amber-200/90 font-medium">
+                <span>{t('type.expense')}</span>
+              </div>
+            </div>
+
+            {/* Support Card 1: Confirmed Entries */}
             <a
               href="#/ledger"
               className={`${card} flex flex-col justify-between hover:border-emerald-600/60 hover:shadow-md transition-all group`}
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="w-10 h-10 rounded-xs bg-emerald-50 text-emerald-800 border border-emerald-200/70 flex items-center justify-center">
+                  <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200/70 flex items-center justify-center">
                     <CheckCircleIcon className="w-5 h-5" />
                   </span>
                   <ArrowRightIcon className="w-4 h-4 text-stone-400 group-hover:text-emerald-700 transition-colors" />
                 </div>
                 <p className="text-stone-600 text-sm font-semibold">{t('home.count')}</p>
-                <p className="text-3xl sm:text-4xl font-extrabold text-stone-900 group-hover:text-emerald-800 transition-colors mt-1">
+                <p className="text-3xl sm:text-4xl font-black text-stone-900 group-hover:text-emerald-800 transition-colors mt-1">
                   {s.confirmedCount}
                 </p>
               </div>
-              <span className="text-xs font-medium text-emerald-700 mt-4 block">
+              <span className="text-xs font-bold text-emerald-700 mt-4 block">
                 {t('home.viewAll')} →
               </span>
             </a>
 
-            {/* Smaller Card 2: Receipts Awaiting Review */}
+            {/* Support Card 2: Receipts / Notes Awaiting Review */}
             <div
               className={`${card} flex flex-col justify-between hover:border-amber-500/60 hover:shadow-md transition-all`}
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="w-10 h-10 rounded-xs bg-amber-50 text-amber-800 border border-amber-200/70 flex items-center justify-center">
-                    <ClockIcon className="w-5 h-5" />
+                  <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-800 border border-amber-200/70 flex items-center justify-center">
+                    <ReceiptIcon className="w-5 h-5" />
                   </span>
                   {s.reviewCount > 0 ? (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-xs bg-amber-100 text-amber-900 border border-amber-300">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">
                       {t('home.pendingBadge')}
                     </span>
                   ) : (
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-xs bg-emerald-100 text-emerald-800">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
                       {t('home.allClear')}
                     </span>
                   )}
                 </div>
                 <p className="text-stone-600 text-sm font-semibold">{t('home.review')}</p>
-                <p className="text-3xl sm:text-4xl font-extrabold text-stone-900 mt-1">
+                <p className="text-3xl sm:text-4xl font-black text-stone-900 mt-1">
                   {s.reviewCount}
                 </p>
               </div>
               {s.reviewCount > 0 ? (
-                <a href="#waiting-section" className="text-xs font-medium text-amber-800 mt-4 block underline">
-                  {t('home.reviewNow')} ({s.reviewCount}) ↓
+                <a href="#waiting-section" className="text-xs font-bold text-amber-800 mt-4 block underline">
+                  {t('home.reviewNow')} ↓
                 </a>
               ) : (
                 <span className="text-xs font-semibold text-emerald-700 mt-4 block">✓ {t('home.none')}</span>
@@ -1655,21 +1552,15 @@ function Home({ onAddReceipt, onOpenVoice, onSelectReceipt, refreshKey }: { onAd
             )}
           </section>
 
-          {/* Spending Analytics: Categories & Top Vendors */}
-          <div className="grid gap-6 md:grid-cols-2">
+          {/* Top Vendors / Suppliers */}
+          {s.topVendors && s.topVendors.length > 0 && (
             <section>
-              <h2 className={h2}>{t('home.cats')}</h2>
-              <CategoryBreakdown
-                rows={c.map(x => ({
-                  label: t('cat.' + x.category),
-                  amount: x.amount,
-                  href: `#/ledger?category=${x.category}`
-                }))}
-                total={s.totalSpent ?? s.totalReceived ?? 0}
-              />
-            </section>
-            <section>
-              <h2 className={h2}>{t('home.vendors')}</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className={h2}>{t('home.vendors')}</h2>
+                <a href="#/ledger" className="text-sm font-semibold text-emerald-800 hover:underline">
+                  {t('home.viewAll')} →
+                </a>
+              </div>
               <TopVendorsList
                 rows={s.topVendors.map(v => ({
                   label: v.vendor,
@@ -1678,7 +1569,7 @@ function Home({ onAddReceipt, onOpenVoice, onSelectReceipt, refreshKey }: { onAd
                 }))}
               />
             </section>
-          </div>
+          )}
         </div>
       )}
     </State>
@@ -1750,8 +1641,8 @@ function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
 function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
   const { t, lang } = useI18n()
   const p = new URLSearchParams(query)
-  const blank: Filters = { q: '', from: '', to: '', category: '', vendor: '' }
-  const [fl, setFl] = useState<Filters>({ ...blank, category: p.get('category') || '', vendor: p.get('vendor') || '' })
+  const blank: Filters = { q: '', from: '', to: '', vendor: '' }
+  const [fl, setFl] = useState<Filters>({ ...blank, vendor: p.get('vendor') || '' })
   const [ex, setEx] = useState<'idle' | 'busy' | 'ok' | 'err'>('idle')
 
   const vendors = useLoad(() => api.summary(), [refreshKey])
@@ -1796,8 +1687,8 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
       </div>
 
       {/* Filter controls */}
-      <div className={`${card} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
-        <div className="sm:col-span-2 lg:col-span-1">
+      <div className={`${card} grid gap-4 sm:grid-cols-2 lg:grid-cols-4`}>
+        <div className="sm:col-span-2">
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.search')}</span>
             <div className="relative">
@@ -1815,17 +1706,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
           </label>
         </div>
 
-        <div>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.category')}</span>
-            <select className={field} value={fl.category} onChange={e => up('category', e.target.value)}>
-              <option value="">{t('cat.all')}</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{t('cat.' + c)}</option>)}
-            </select>
-          </label>
-        </div>
-
-        <div>
+        <div className="sm:col-span-2">
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.vendor')}</span>
             <select className={field} value={fl.vendor} onChange={e => up('vendor', e.target.value)}>
@@ -1849,7 +1730,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
           </label>
         </div>
 
-        <div className="flex items-end">
+        <div className="flex items-end sm:col-span-2 lg:col-span-2">
           <button className={`${ghost} w-full`} onClick={() => setFl(blank)}>
             {t('lg.clear')}
           </button>
@@ -1986,8 +1867,10 @@ export default function App(){
       setAccount(null)
       setAuthError('')
     }
-    window.addEventListener('shopledger:unauthorized',expired)
-    return ()=>window.removeEventListener('shopledger:unauthorized',expired)
+    window.addEventListener('vyapar-mitra:unauthorized',expired)
+    return ()=>{
+      window.removeEventListener('vyapar-mitra:unauthorized',expired)
+    }
   },[])
   const h = useHash()
   const [path, query = ''] = h.split('?')
@@ -1999,8 +1882,43 @@ export default function App(){
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Header Dropdown Menu state
+  // Header state & click-outside detection
   const [menuOpen, setMenuOpen] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
+
+  // Close mobile dropdown menu on click outside or Escape key
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [menuOpen])
+
+  // Automatically close mobile menu when expanding to tablet/desktop (>= 640px)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 640) {
+        setMenuOpen(false)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Direct route detection for #/receipt/:id
   useEffect(() => {
@@ -2040,6 +1958,14 @@ export default function App(){
     }
   }
 
+  const handleModalDeleted = () => {
+    setActiveModal(null)
+    setRefreshKey(prev => prev + 1)
+    if (location.hash.startsWith('#/receipt/')) {
+      location.hash = '#/'
+    }
+  }
+
   const handleAuthenticated = (nextAccount:Account) => {
     setAccount(nextAccount)
     setAuthError('')
@@ -2054,19 +1980,6 @@ export default function App(){
       location.hash='#/'
     }catch(error){
       setToastMessage(error instanceof Error?error.message:t('auth.error'))
-      setTimeout(()=>setToastMessage(null),5000)
-    }
-  }
-
-  const changeLanguage = async () => {
-    if(!account)return
-    const language=lang==='en'?'hi':'en'
-    try{
-      const updated=await api.saveProfile({...account,language})
-      setAccount(updated)
-      setLang(updated.language)
-    }catch(error){
-      setToastMessage(error instanceof Error?error.message:t('settings.saveError'))
       setTimeout(()=>setToastMessage(null),5000)
     }
   }
@@ -2127,6 +2040,7 @@ export default function App(){
           file={activeModal.file}
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
+          onDeleted={handleModalDeleted}
         />
       )}
 
@@ -2141,48 +2055,101 @@ export default function App(){
         }}
       />
 
-      {/* Top Header Bar - Only Logo is visible, with a dropdown menu trigger */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-2xs">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:py-3.5">
-          {/* Only Logo visible on the header */}
-          <a href="#/" className="flex items-center gap-2.5 text-emerald-900 group">
-            <span className="w-10 h-10 rounded-xs bg-emerald-700 text-white flex items-center justify-center shadow-xs group-hover:bg-emerald-800 transition-colors">
-              <StoreIcon className="w-5 h-5" />
-            </span>
-            <div className="leading-tight">
-              <span className="text-xl sm:text-2xl font-extrabold tracking-tight block text-emerald-950">
-                {t('app.name')}
-              </span>
-              <span className="text-[11px] font-medium text-stone-500 uppercase tracking-wider hidden sm:block">
-                Digital Shopkeeper Ledger
+      {/* Top Header Bar - Clean, Left-Aligned Logo & Responsive Navigation */}
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all"
+      >
+        <div className="w-full flex items-center justify-between px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3">
+          {/* Brand Logo strictly pinned to the far left corner */}
+          <a
+            href="#/"
+            onClick={() => setMenuOpen(false)}
+            className="flex items-center gap-2.5 sm:gap-3 group select-none transition-transform active:scale-[0.99] shrink-0"
+            aria-label="Vyapar Mitra Home"
+          >
+            {/* Sleek Geometric Logo Icon */}
+            <div className="relative shrink-0 flex items-center justify-center">
+              <VyaparMitraLogo className="w-9 h-9 sm:w-10 sm:h-10 drop-shadow-sm group-hover:scale-105 group-hover:drop-shadow transition-all duration-200" />
+              <span
+                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white ring-1 ring-emerald-600/20"
+                title="Synced & Active"
+              />
+            </div>
+
+            {/* Refined Brand Typography & SaaS Accent */}
+            <div className="leading-tight flex flex-col justify-center">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="text-lg sm:text-[21px] font-black tracking-tight text-stone-900 group-hover:text-emerald-950 transition-colors">
+                  {lang === 'hi' ? 'व्यापार' : 'Vyapar'}
+                </span>
+                <span className="text-lg sm:text-[21px] font-black tracking-tight bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent">
+                  {lang === 'hi' ? 'मित्र' : 'Mitra'}
+                </span>
+                <span className="hidden xl:inline-flex items-center px-1.5 py-0.5 rounded-xs text-[10px] font-extrabold uppercase tracking-wide bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-2xs">
+                  {lang === 'hi' ? 'डिजिटल बहीखाता' : 'Smart Ledger'}
+                </span>
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-stone-500 tracking-normal hidden md:block">
+                {lang === 'hi' ? 'दुकानदार का भरोसेमंद साथी' : 'Digital Retail Ledger & Business Companion'}
               </span>
             </div>
           </a>
 
-          {/* Menu Trigger */}
-          <div className="flex items-center gap-2">
+          {/* Laptop & Desktop Layout (640px and wider): Clean horizontal navigation tabs */}
+          <nav aria-label={t('nav.label')} className="hidden sm:flex items-center gap-1 md:gap-1.5 lg:gap-2">
+            {nav.map(item => {
+              const active = path === item.p
+              const Icon = item.icon
+              return (
+                <a
+                  key={item.p}
+                  href={'#' + item.p}
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-150 select-none ${
+                    active
+                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs'
+                      : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 transition-colors ${active ? 'text-emerald-700' : 'text-stone-400'}`} />
+                  <span className="whitespace-nowrap">{t(item.k)}</span>
+                </a>
+              )
+            })}
+          </nav>
+
+          {/* Mobile Layout (< 640px / sm): Hamburger toggle button on the right */}
+          <div className="flex sm:hidden items-center gap-2">
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-expanded={menuOpen}
               aria-label={t('nav.label')}
-              className="flex items-center gap-2 px-3 py-2 rounded-xs border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 font-semibold text-sm shadow-2xs cursor-pointer transition-colors"
+              className={`flex items-center justify-center p-2 rounded-xl border font-semibold shadow-2xs cursor-pointer transition-all active:scale-95 ${
+                menuOpen
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300 ring-2 ring-emerald-500/20'
+                  : 'bg-white hover:bg-stone-50 border-stone-300 text-stone-800 hover:border-emerald-600/40'
+              }`}
             >
               {menuOpen ? (
-                <XIcon className="w-5 h-5 text-stone-700" />
+                <XIcon className="w-5 h-5 text-emerald-800" />
               ) : (
                 <MenuIcon className="w-5 h-5 text-stone-700" />
               )}
-              <ChevronDownIcon className={`w-4 h-4 text-stone-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* Dropdown Navigation Menu */}
+        {/* Mobile Dropdown Menu (screens smaller than 640px) */}
         {menuOpen && (
-          <div className="border-t border-stone-200 bg-white shadow-md animate-in slide-in-from-top-1 duration-150">
-            <div className="mx-auto max-w-5xl px-4 py-3 space-y-3">
-              <nav aria-label={t('nav.label')} className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div
+            className="sm:hidden border-t border-stone-200/90 bg-white/98 backdrop-blur-md shadow-lg animate-in slide-in-from-top-2 duration-150"
+            role="dialog"
+            aria-label={t('nav.label')}
+          >
+            <div className="px-4 py-3">
+              <nav aria-label={t('nav.label')} className="flex flex-col space-y-1">
                 {nav.map(item => {
                   const active = path === item.p
                   const Icon = item.icon
@@ -2192,25 +2159,27 @@ export default function App(){
                       href={'#' + item.p}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-2.5 py-2.5 px-3 rounded-xs text-sm font-semibold transition-all ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors active:scale-[0.99] ${
                         active
-                          ? 'bg-emerald-50 text-emerald-900 border border-emerald-300'
-                          : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
+                          ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs'
+                          : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50 border border-transparent'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
-                      <span className="truncate">{t(item.k)}</span>
+                      <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-400'}`} />
+                      <span className="flex-1">{t(item.k)}</span>
+                      {active && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                      )}
                     </a>
                   )
                 })}
               </nav>
-
               <div className="pt-2 border-t border-stone-200/80 flex items-center justify-end">
                 <button
-                  className="min-h-[38px] px-3.5 rounded-xs border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
+                  className="min-h-[38px] px-3.5 rounded-xl border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
                   aria-label={t('lang.label')}
                   onClick={() => {
-                    void changeLanguage()
+                    setLang(lang === 'en' ? 'hi' : 'en')
                     setMenuOpen(false)
                   }}
                 >
@@ -2237,7 +2206,7 @@ export default function App(){
         ) : path === '/ask' ? (
           <Ask onSelectReceipt={r => setActiveModal({ id: r.id })} />
         ) : path === '/settings' ? (
-          <SettingsPage account={account} onAccountUpdated={updated=>{setAccount(updated);setCurrency(updated.currency)}} onSignOut={handleSignOut}/>
+          <SettingsPage account={account} onAccountUpdated={updated=>{setAccount(updated);setCurrency(updated.currency);setLang(updated.language)}} onSignOut={handleSignOut}/>
         ) : (
           <Home
             onAddReceipt={() => hiddenFileInputRef.current?.click()}

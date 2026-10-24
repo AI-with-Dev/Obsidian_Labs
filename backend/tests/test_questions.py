@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.database import init_db
+from conftest import ensure_test_owner
 
 
 @pytest.fixture(autouse=True)
@@ -15,6 +16,7 @@ def setup_db(tmp_path, monkeypatch):
     monkeypatch.setattr("backend.app.config.settings.DATABASE_PATH", str(test_db))
     monkeypatch.setattr("backend.app.config.settings.UPLOAD_DIR", str(test_uploads))
     init_db(str(test_db))
+    ensure_test_owner(str(test_db))
 
 
 client = TestClient(app)
@@ -130,3 +132,34 @@ def test_question_unsupported_queries():
     res_rev = client.post("/api/questions/ask", json={"question": "What is our total sales revenue?", "lang": "en"})
     assert res_rev.status_code == 200
     assert res_rev.json()["data"]["supported"] is False
+
+
+def test_question_money_received_and_borrowed_items():
+    """Test Q&A on Money Received (collections) and Borrowed Items (active credit udhar)."""
+    # 1. Money received (income): Suresh Bhai ₹500
+    r1 = client.post("/api/receipts/upload", files={"file": ("suresh.png", io.BytesIO(b"suresh"), "image/png")}).json()["data"]["id"]
+    client.patch(f"/api/receipts/{r1}", json={"vendor": "Suresh Bhai", "date": "2026-10-14", "total": 500.0, "type": "income"})
+    client.post(f"/api/receipts/{r1}/confirm")
+
+    # 2. Borrowed / credit udhar (expense): Ramesh ₹20
+    r2 = client.post("/api/receipts/upload", files={"file": ("ramesh.png", io.BytesIO(b"ramesh"), "image/png")}).json()["data"]["id"]
+    client.patch(f"/api/receipts/{r2}", json={"vendor": "Ramesh", "date": "2026-10-14", "total": 20.0, "type": "expense"})
+    client.post(f"/api/receipts/{r2}/confirm")
+
+    # Question about money received in English
+    res_inc = client.post("/api/questions/ask", json={"question": "How much total money received?", "lang": "en"})
+    assert res_inc.status_code == 200
+    data_inc = res_inc.json()["data"]
+    assert data_inc["supported"] is True
+    assert "₹500.00" in data_inc["answer"]
+    assert len(data_inc["receipts"]) == 1
+    assert data_inc["receipts"][0]["vendor"] == "Suresh Bhai"
+
+    # Question about borrowed items / udhar in Hindi
+    res_bor = client.post("/api/questions/ask", json={"question": "कुल बाकी उधार कितना है?", "lang": "hi"})
+    assert res_bor.status_code == 200
+    data_bor = res_bor.json()["data"]
+    assert data_bor["supported"] is True
+    assert "₹20.00" in data_bor["answer"]
+    assert len(data_bor["receipts"]) == 1
+    assert data_bor["receipts"][0]["vendor"] == "Ramesh"

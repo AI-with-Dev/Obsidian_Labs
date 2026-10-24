@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Account, changePassword, exportCsv, exportPdf, saveProfile, signIn, signUp } from './api'
 import { Lang, useI18n } from './i18n'
+import { VyaparMitraLogo } from './components/VyaparMitraLogo'
 
 const panel = 'rounded-2xl border border-stone-200 bg-white p-5 shadow-xs sm:p-7'
 const input = 'mt-1.5 min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3.5 text-base text-stone-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600'
@@ -63,7 +64,9 @@ export function AuthPage({ error, onRetry, onAuthenticated }: AuthPageProps) {
     <main className="flex min-h-screen items-center justify-center bg-[#FAF7F2] px-4 py-8 text-stone-900">
       <section className="w-full max-w-xl space-y-5">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 text-xl font-extrabold text-white shadow-sm">S</div>
+          <div className="mx-auto mb-4 flex justify-center">
+            <VyaparMitraLogo className="w-16 h-16 drop-shadow-md hover:scale-105 transition-transform" />
+          </div>
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-800">{t('app.name')}</p>
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
             {mode === 'login' ? t('auth.loginTitle') : t('auth.setupTitle')}
@@ -84,12 +87,6 @@ export function AuthPage({ error, onRetry, onAuthenticated }: AuthPageProps) {
               </label>
               <label className={label}>{t('auth.phone')}
                 <input className={input} type="tel" autoComplete="tel" maxLength={40} value={setup.phone} onChange={e => updateSetup('phone', e.target.value)} />
-              </label>
-              <label className={label}>{t('auth.gstin')}
-                <input className={input} autoComplete="off" maxLength={20} value={setup.gstin} onChange={e => updateSetup('gstin', e.target.value)} />
-              </label>
-              <label className={label}>{t('auth.address')}
-                <textarea className={`${input} min-h-20 py-3`} autoComplete="street-address" maxLength={300} value={setup.address} onChange={e => updateSetup('address', e.target.value)} />
               </label>
             </>
           )}
@@ -218,7 +215,7 @@ type SettingsPageProps = {
 }
 
 export function SettingsPage({ account, onAccountUpdated, onSignOut }: SettingsPageProps) {
-  const { t, setLang } = useI18n()
+  const { t, lang, setLang } = useI18n()
   const [profile, setProfile] = useState(account)
   const [currentPassword, setCurrentPassword] = useState('')
   const [emailPassword, setEmailPassword] = useState('')
@@ -230,6 +227,19 @@ export function SettingsPage({ account, onAccountUpdated, onSignOut }: SettingsP
   const [exportBusy, setExportBusy] = useState(false)
 
   useEffect(() => setProfile(account), [account])
+
+  const selectLanguage = async (newLang: Lang) => {
+    if (newLang === (profile.language || lang)) return
+    setLang(newLang)
+    setProfile(curr => ({ ...curr, language: newLang }))
+    try {
+      const updated = await saveProfile({ ...profile, language: newLang })
+      onAccountUpdated(updated)
+      setNotice(t('settings.saved'))
+    } catch {
+      // Keep UI language updated locally
+    }
+  }
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -298,6 +308,69 @@ export function SettingsPage({ account, onAccountUpdated, onSignOut }: SettingsP
         </div>
       )}
 
+      {/* 1. Language Preferences Section */}
+      <section className={`${panel} space-y-3.5`}>
+        <div>
+          <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
+            <span>🌐</span>
+            <span>{t('auth.language')} / Language</span>
+          </h2>
+          <p className="mt-1 text-sm text-stone-600">
+            {lang === 'hi'
+              ? 'व्यापार मित्र का उपयोग करने के लिए अपनी पसंदीदा भाषा चुनें।'
+              : 'Choose your preferred language for using Vyapar Mitra.'}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => void selectLanguage('en')}
+            className={`flex items-center justify-between p-3.5 rounded-xl border-2 font-bold text-base transition-all cursor-pointer ${
+              (profile.language || lang) === 'en'
+                ? 'border-emerald-700 bg-emerald-50/80 text-emerald-950 shadow-xs ring-1 ring-emerald-700/20'
+                : 'border-stone-200 bg-white text-stone-700 hover:border-emerald-600/40 hover:bg-stone-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl leading-none">🇬🇧</span>
+              <div className="text-left leading-tight">
+                <span className="block font-bold">English</span>
+                <span className="text-xs text-stone-500 font-normal">Default English</span>
+              </div>
+            </div>
+            {(profile.language || lang) === 'en' && (
+              <span className="text-xs bg-emerald-700 text-white px-2.5 py-1 rounded-full font-bold">
+                ✓ {lang === 'hi' ? 'सक्रिय' : 'Active'}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void selectLanguage('hi')}
+            className={`flex items-center justify-between p-3.5 rounded-xl border-2 font-bold text-base transition-all cursor-pointer ${
+              (profile.language || lang) === 'hi'
+                ? 'border-emerald-700 bg-emerald-50/80 text-emerald-950 shadow-xs ring-1 ring-emerald-700/20'
+                : 'border-stone-200 bg-white text-stone-700 hover:border-emerald-600/40 hover:bg-stone-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl leading-none">🇮🇳</span>
+              <div className="text-left leading-tight">
+                <span className="block font-bold">हिन्दी</span>
+                <span className="text-xs text-stone-500 font-normal">Hindi language</span>
+              </div>
+            </div>
+            {(profile.language || lang) === 'hi' && (
+              <span className="text-xs bg-emerald-700 text-white px-2.5 py-1 rounded-full font-bold">
+                ✓ {lang === 'hi' ? 'सक्रिय' : 'Active'}
+              </span>
+            )}
+          </button>
+        </div>
+      </section>
+
       <form className={`${panel} space-y-4`} onSubmit={save}>
         <div>
           <h2 className="text-lg font-bold text-stone-900">{t('settings.businessTitle')}</h2>
@@ -319,16 +392,8 @@ export function SettingsPage({ account, onAccountUpdated, onSignOut }: SettingsP
             <input className={input} type="password" autoComplete="current-password" required value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
           </label>
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className={label}>{t('auth.phone')}
-            <input className={input} type="tel" autoComplete="tel" maxLength={40} value={profile.phone} onChange={e => update('phone', e.target.value)} />
-          </label>
-          <label className={label}>{t('auth.gstin')}
-            <input className={input} maxLength={20} value={profile.gstin} onChange={e => update('gstin', e.target.value)} />
-          </label>
-        </div>
-        <label className={label}>{t('auth.address')}
-          <textarea className={`${input} min-h-20 py-3`} autoComplete="street-address" maxLength={300} value={profile.address} onChange={e => update('address', e.target.value)} />
+        <label className={label}>{t('auth.phone')}
+          <input className={input} type="tel" autoComplete="tel" maxLength={40} value={profile.phone} onChange={e => update('phone', e.target.value)} />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className={label}>{t('auth.language')}

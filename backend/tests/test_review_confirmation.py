@@ -12,6 +12,7 @@ if str(root_dir) not in sys.path:
 from backend.app.config import settings
 from backend.app.database import get_db, init_db
 from backend.app.main import app
+from conftest import ensure_test_owner
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +23,7 @@ def setup_isolated_db(tmp_path):
     temp_uploads.mkdir(parents=True, exist_ok=True)
 
     init_db(str(temp_db))
+    ensure_test_owner(str(temp_db))
 
     orig_db = settings.DATABASE_PATH
     orig_up = settings.UPLOAD_DIR
@@ -186,3 +188,29 @@ def test_confirm_receipt_success():
     res2 = client.post(f"/api/receipts/{receipt_id}/confirm")
     assert res2.status_code == 200
     assert res2.json()["data"]["status"] == "confirmed"
+
+
+@pytest.mark.parametrize(
+    ("category", "expected_type"),
+    [
+        ("inventory", "expense"),
+        ("retail_sales", "expense"),
+    ],
+)
+def test_manual_receipts_default_to_expense_without_firm_match(category, expected_type):
+    """A category alone must never classify a receipt as income."""
+    client = TestClient(app)
+    receipt_id = _upload_sample_receipt(client)
+
+    response = client.patch(
+        f"/api/receipts/{receipt_id}",
+        json={
+            "vendor": "Example Shop",
+            "date": "2026-10-22",
+            "total": 100.0,
+            "category": category,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["type"] == expected_type

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.database import init_db
 from backend.app.main import app
+from conftest import ensure_test_owner
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "data/test_fixtures"
 GROUND_TRUTH_PATH = FIXTURES_DIR / "ground_truth.json"
@@ -21,6 +22,7 @@ def setup_db(tmp_path, monkeypatch):
     monkeypatch.setattr("backend.app.config.settings.DATABASE_PATH", str(test_db))
     monkeypatch.setattr("backend.app.config.settings.UPLOAD_DIR", str(test_uploads))
     init_db(str(test_db))
+    ensure_test_owner(str(test_db))
 
 
 @pytest.fixture

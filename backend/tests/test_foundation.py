@@ -59,6 +59,14 @@ def test_health_endpoint():
     assert data["data"]["database"] == "connected"
 
 
+@pytest.mark.parametrize("path", ["/", "/script-health-check", "/healthz"])
+def test_hosting_health_endpoints(path):
+    """Hosting platform probes receive success instead of route-not-found responses."""
+    response = TestClient(app).get(path)
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
 def test_404_error_envelope():
     """Verify missing endpoints return structured error envelope."""
     client = TestClient(app)

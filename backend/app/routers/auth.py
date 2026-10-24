@@ -20,6 +20,17 @@ PASSWORD_ITERATIONS = 310_000
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+def _cookie_security(request: Request) -> tuple[bool, str]:
+    origin = request.headers.get("origin", "")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+    secure = (
+        request.url.scheme == "https"
+        or forwarded_proto == "https"
+        or origin.startswith("https://")
+    )
+    return secure, "none" if secure else "lax"
+
+
 class AccountInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -117,6 +128,7 @@ def _new_session(owner_id: int, response: Response, request: Request) -> None:
     token = secrets.token_urlsafe(32)
     expires_at = int(time.time()) + SESSION_TTL_SECONDS
     token_hash = hashlib.sha256(token.encode()).hexdigest()
+    secure, samesite = _cookie_security(request)
     with get_db() as conn:
         conn.execute(
             "INSERT INTO login_sessions(token_hash, owner_id, expires_at) VALUES (?, ?, ?)",
@@ -127,8 +139,8 @@ def _new_session(owner_id: int, response: Response, request: Request) -> None:
         token,
         max_age=SESSION_TTL_SECONDS,
         httponly=True,
-        secure=request.url.scheme == "https",
-        samesite="strict",
+        secure=secure,
+        samesite=samesite,
         path="/api",
     )
 
@@ -152,7 +164,7 @@ def _session_owner(request: Request):
         if row is None:
             conn.execute("DELETE FROM login_sessions WHERE expires_at <= ?", (now,))
             return None
-        return _account_payload(row)
+        return {"id": row["id"], **_account_payload(row)}
 
 
 def require_authenticated_owner(request: Request) -> dict:
@@ -169,11 +181,11 @@ def require_authenticated_owner(request: Request) -> dict:
 async def auth_status(request: Request):
     owner = _session_owner(request)
     with get_db() as conn:
-        configured = conn.execute("SELECT 1 FROM shop_owner WHERE id = 1").fetchone() is not None
+        configured = conn.execute("SELECT 1 FROM shop_owner LIMIT 1").fetchone() is not None
     return ApiResponse.ok({
         "configured": configured,
         "authenticated": owner is not None,
-        "account": owner,
+        "account": {key: value for key, value in owner.items() if key != "id"} if owner else None,
     })
 
 
@@ -191,15 +203,11 @@ async def setup_account(payload: AccountInput, request: Request, response: Respo
 
     try:
         with get_db() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            existing = conn.execute("SELECT 1 FROM shop_owner WHERE id = 1").fetchone()
-            if existing:
-                raise HTTPException(status_code=409, detail="The owner account is already set up.")
             conn.execute(
                 """
                 INSERT INTO shop_owner
-                    (id, full_name, email, password_hash, business_name, phone, address, gstin, language, currency)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (full_name, email, password_hash, business_name, phone, address, gstin, language, currency)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     payload.fullName.strip(),
@@ -213,7 +221,12 @@ async def setup_account(payload: AccountInput, request: Request, response: Respo
                     payload.currency,
                 ),
             )
-            owner_id = 1
+            owner_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email address already exists.",
+        ) from exc
     except HTTPException:
         raise
 
@@ -241,13 +254,20 @@ async def logout(request: Request, response: Response):
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         with get_db() as conn:
             conn.execute("DELETE FROM login_sessions WHERE token_hash = ?", (token_hash,))
-    response.delete_cookie(SESSION_COOKIE, path="/api", httponly=True, samesite="strict")
+    secure, samesite = _cookie_security(request)
+    response.delete_cookie(
+        SESSION_COOKIE,
+        path="/api",
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+    )
     return ApiResponse.ok({"signedOut": True})
 
 
 @router.get("/me", response_model=ApiResponse[dict])
 async def current_account(owner: dict = Depends(require_authenticated_owner)):
-    return ApiResponse.ok(owner)
+    return ApiResponse.ok({key: value for key, value in owner.items() if key != "id"})
 
 
 @router.patch("/profile", response_model=ApiResponse[dict])
@@ -267,7 +287,10 @@ async def update_profile(payload: AccountUpdate, owner: dict = Depends(require_a
             raise HTTPException(status_code=400, detail="Enter a valid email address.")
         if updates["email"] != owner["email"]:
             with get_db() as conn:
-                row = conn.execute("SELECT password_hash FROM shop_owner WHERE id = 1").fetchone()
+                row = conn.execute(
+                    "SELECT password_hash FROM shop_owner WHERE id = ?",
+                    (owner["id"],),
+                ).fetchone()
             if current_password is None or not _verify_password(current_password, row["password_hash"]):
                 raise HTTPException(
                     status_code=400,
@@ -291,8 +314,15 @@ async def update_profile(payload: AccountUpdate, owner: dict = Depends(require_a
               for key, value in updates.items()]
     try:
         with get_db() as conn:
-            conn.execute(f"UPDATE shop_owner SET {assignments} WHERE id = 1", values)
-            row = conn.execute("SELECT * FROM shop_owner WHERE id = 1").fetchone()
+            values.append(owner["id"])
+            conn.execute(
+                f"UPDATE shop_owner SET {assignments} WHERE id = ?",
+                values,
+            )
+            row = conn.execute(
+                "SELECT * FROM shop_owner WHERE id = ?",
+                (owner["id"],),
+            ).fetchone()
     except sqlite3.IntegrityError as exc:
         raise HTTPException(status_code=409, detail="That email address is already in use.") from exc
     return ApiResponse.ok(_account_payload(row))
@@ -311,10 +341,16 @@ async def update_password(
     if policy_error:
         raise HTTPException(status_code=400, detail=policy_error)
     with get_db() as conn:
-        row = conn.execute("SELECT password_hash FROM shop_owner WHERE id = 1").fetchone()
+        row = conn.execute(
+            "SELECT password_hash FROM shop_owner WHERE id = ?",
+            (owner["id"],),
+        ).fetchone()
         if row is None or not _verify_password(payload.currentPassword, row["password_hash"]):
             raise HTTPException(status_code=400, detail="Current password is incorrect.")
-        conn.execute("UPDATE shop_owner SET password_hash = ? WHERE id = 1", (_hash_password(payload.newPassword),))
-        conn.execute("DELETE FROM login_sessions WHERE owner_id = 1")
-    _new_session(1, response, request)
+        conn.execute(
+            "UPDATE shop_owner SET password_hash = ? WHERE id = ?",
+            (_hash_password(payload.newPassword), owner["id"]),
+        )
+        conn.execute("DELETE FROM login_sessions WHERE owner_id = ?", (owner["id"],))
+    _new_session(owner["id"], response, request)
     return ApiResponse.ok({"passwordChanged": True, "account": owner})
