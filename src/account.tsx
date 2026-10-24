@@ -215,7 +215,7 @@ type SettingsPageProps = {
 }
 
 export function SettingsPage({ account, onAccountUpdated, onSignOut }: SettingsPageProps) {
-  const { t, setLang } = useI18n()
+  const { t, lang, setLang } = useI18n()
   const [profile, setProfile] = useState(account)
   const [currentPassword, setCurrentPassword] = useState('')
   const [emailPassword, setEmailPassword] = useState('')
@@ -227,6 +227,19 @@ export function SettingsPage({ account, onAccountUpdated, onSignOut }: SettingsP
   const [exportBusy, setExportBusy] = useState(false)
 
   useEffect(() => setProfile(account), [account])
+
+  const selectLanguage = async (newLang: Lang) => {
+    if (newLang === (profile.language || lang)) return
+    setLang(newLang)
+    setProfile(curr => ({ ...curr, language: newLang }))
+    try {
+      const updated = await saveProfile({ ...profile, language: newLang })
+      onAccountUpdated(updated)
+      setNotice(t('settings.saved'))
+    } catch {
+      // Keep UI language updated locally
+    }
+  }
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -294,6 +307,69 @@ export function SettingsPage({ account, onAccountUpdated, onSignOut }: SettingsP
           {error || notice}
         </div>
       )}
+
+      {/* 1. Language Preferences Section */}
+      <section className={`${panel} space-y-3.5`}>
+        <div>
+          <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
+            <span>🌐</span>
+            <span>{t('auth.language')} / Language</span>
+          </h2>
+          <p className="mt-1 text-sm text-stone-600">
+            {lang === 'hi'
+              ? 'व्यापार मित्र का उपयोग करने के लिए अपनी पसंदीदा भाषा चुनें।'
+              : 'Choose your preferred language for using Vyapar Mitra.'}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => void selectLanguage('en')}
+            className={`flex items-center justify-between p-3.5 rounded-xl border-2 font-bold text-base transition-all cursor-pointer ${
+              (profile.language || lang) === 'en'
+                ? 'border-emerald-700 bg-emerald-50/80 text-emerald-950 shadow-xs ring-1 ring-emerald-700/20'
+                : 'border-stone-200 bg-white text-stone-700 hover:border-emerald-600/40 hover:bg-stone-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl leading-none">🇬🇧</span>
+              <div className="text-left leading-tight">
+                <span className="block font-bold">English</span>
+                <span className="text-xs text-stone-500 font-normal">Default English</span>
+              </div>
+            </div>
+            {(profile.language || lang) === 'en' && (
+              <span className="text-xs bg-emerald-700 text-white px-2.5 py-1 rounded-full font-bold">
+                ✓ {lang === 'hi' ? 'सक्रिय' : 'Active'}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void selectLanguage('hi')}
+            className={`flex items-center justify-between p-3.5 rounded-xl border-2 font-bold text-base transition-all cursor-pointer ${
+              (profile.language || lang) === 'hi'
+                ? 'border-emerald-700 bg-emerald-50/80 text-emerald-950 shadow-xs ring-1 ring-emerald-700/20'
+                : 'border-stone-200 bg-white text-stone-700 hover:border-emerald-600/40 hover:bg-stone-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl leading-none">🇮🇳</span>
+              <div className="text-left leading-tight">
+                <span className="block font-bold">हिन्दी</span>
+                <span className="text-xs text-stone-500 font-normal">Hindi language</span>
+              </div>
+            </div>
+            {(profile.language || lang) === 'hi' && (
+              <span className="text-xs bg-emerald-700 text-white px-2.5 py-1 rounded-full font-bold">
+                ✓ {lang === 'hi' ? 'सक्रिय' : 'Active'}
+              </span>
+            )}
+          </button>
+        </div>
+      </section>
 
       <form className={`${panel} space-y-4`} onSubmit={save}>
         <div>

@@ -1235,7 +1235,6 @@ export default function App(){
 
   // Header state & click-outside detection
   const [menuOpen, setMenuOpen] = useState(false)
-  const [exportingPdf, setExportingPdf] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
 
   // Close mobile dropdown menu on click outside or Escape key
@@ -1336,33 +1335,6 @@ export default function App(){
     }
   }
 
-  const changeLanguage = async () => {
-    if(!account)return
-    const language=lang==='en'?'hi':'en'
-    try{
-      const updated=await api.saveProfile({...account,language})
-      setAccount(updated)
-      setLang(updated.language)
-    }catch(error){
-      setToastMessage(error instanceof Error?error.message:t('settings.saveError'))
-      setTimeout(()=>setToastMessage(null),5000)
-    }
-  }
-
-  const handleExportPdf = async () => {
-    try {
-      setExportingPdf(true)
-      await api.exportPdf()
-      setToastMessage(t('settings.exported'))
-      setTimeout(() => setToastMessage(null), 4000)
-    } catch {
-      setToastMessage(t('settings.exportError'))
-      setTimeout(() => setToastMessage(null), 4000)
-    } finally {
-      setExportingPdf(false)
-    }
-  }
-
   const nav = [
     { p: '/', k: 'nav.home', icon: StoreIcon },
     { p: '/upload', k: 'nav.upload', icon: PlusIcon },
@@ -1423,13 +1395,13 @@ export default function App(){
         />
       )}
 
-      {/* Top Header Bar - Responsive Adaptive Mobile & Desktop Navigation */}
+      {/* Top Header Bar - Clean, Left-Aligned Logo & Responsive Navigation */}
       <header
         ref={headerRef}
         className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all"
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4 py-2.5">
-          {/* Brand Logo & Typography Lockup */}
+        <div className="w-full flex items-center justify-between px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3">
+          {/* Brand Logo strictly pinned to the far left corner */}
           <a
             href="#/"
             onClick={() => setMenuOpen(false)}
@@ -1464,7 +1436,7 @@ export default function App(){
             </div>
           </a>
 
-          {/* Laptop & Desktop Layout (640px and wider): Full horizontal inline navigation */}
+          {/* Laptop & Desktop Layout (640px and wider): Clean horizontal navigation tabs */}
           <nav aria-label={t('nav.label')} className="hidden sm:flex items-center gap-1 md:gap-1.5 lg:gap-2">
             {nav.map(item => {
               const active = path === item.p
@@ -1474,7 +1446,7 @@ export default function App(){
                   key={item.p}
                   href={'#' + item.p}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs md:text-sm font-semibold transition-all duration-150 select-none ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-150 select-none ${
                     active
                       ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs'
                       : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
@@ -1487,33 +1459,6 @@ export default function App(){
             })}
           </nav>
 
-          {/* Desktop Right Quick Actions (Export PDF & Language Switcher) */}
-          <div className="hidden sm:flex items-center gap-1.5 md:gap-2 border-l border-stone-200/80 pl-2 md:pl-3">
-            <button
-              type="button"
-              disabled={exportingPdf}
-              onClick={handleExportPdf}
-              aria-label={t('nav.exportPdf')}
-              title={t('nav.exportPdf')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs border border-stone-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/70 text-stone-700 hover:text-emerald-900 text-xs md:text-sm font-semibold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-            >
-              <DownloadIcon className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-              <span className="hidden lg:inline">{t('nav.exportPdf')}</span>
-              <span className="lg:hidden">PDF</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void changeLanguage()}
-              aria-label={t('lang.label')}
-              title={t('lang.label')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs border border-stone-200 hover:border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-xs md:text-sm font-semibold shadow-2xs transition-all cursor-pointer"
-            >
-              <span className="text-sm leading-none">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
-              <span>{t('lang.other')}</span>
-            </button>
-          </div>
-
           {/* Mobile Layout (< 640px / sm): Hamburger toggle button on the right */}
           <div className="flex sm:hidden items-center gap-2">
             <button
@@ -1521,7 +1466,7 @@ export default function App(){
               onClick={() => setMenuOpen(!menuOpen)}
               aria-expanded={menuOpen}
               aria-label={t('nav.label')}
-              className={`flex items-center justify-center p-2 rounded-xs border font-semibold shadow-2xs cursor-pointer transition-all active:scale-95 ${
+              className={`flex items-center justify-center p-2 rounded-xl border font-semibold shadow-2xs cursor-pointer transition-all active:scale-95 ${
                 menuOpen
                   ? 'bg-emerald-50 text-emerald-900 border-emerald-300 ring-2 ring-emerald-500/20'
                   : 'bg-white hover:bg-stone-50 border-stone-300 text-stone-800 hover:border-emerald-600/40'
@@ -1543,8 +1488,7 @@ export default function App(){
             role="dialog"
             aria-label={t('nav.label')}
           >
-            <div className="px-4 py-3 space-y-3">
-              {/* Navigation links list */}
+            <div className="px-4 py-3">
               <nav aria-label={t('nav.label')} className="flex flex-col space-y-1">
                 {nav.map(item => {
                   const active = path === item.p
@@ -1555,7 +1499,7 @@ export default function App(){
                       href={'#' + item.p}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xs text-sm font-semibold transition-colors active:scale-[0.99] ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors active:scale-[0.99] ${
                         active
                           ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs'
                           : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50 border border-transparent'
@@ -1570,43 +1514,6 @@ export default function App(){
                   )
                 })}
               </nav>
-
-              {/* Action triggers: Export PDF & Language Switcher */}
-              <div className="pt-2.5 border-t border-stone-200 flex flex-col gap-2">
-                <button
-                  type="button"
-                  disabled={exportingPdf}
-                  onClick={() => {
-                    setMenuOpen(false)
-                    void handleExportPdf()
-                  }}
-                  className="flex items-center justify-between w-full px-3 py-2.5 rounded-xs border border-stone-200 hover:border-emerald-300 bg-stone-50 hover:bg-emerald-50 text-stone-800 hover:text-emerald-900 text-sm font-semibold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <DownloadIcon className="w-4 h-4 text-emerald-700 shrink-0" />
-                    <span>{t('nav.exportPdf')}</span>
-                  </div>
-                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">PDF</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    void changeLanguage()
-                  }}
-                  className="flex items-center justify-between w-full px-3 py-2.5 rounded-xs border border-stone-200 hover:border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold transition-colors shadow-2xs cursor-pointer"
-                  aria-label={t('lang.label')}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base leading-none">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
-                    <span>{t('lang.label')}: {t('lang.other')}</span>
-                  </div>
-                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wide">
-                    {lang === 'en' ? 'हिन्दी' : 'English'}
-                  </span>
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -1626,7 +1533,7 @@ export default function App(){
         ) : path === '/ask' ? (
           <Ask onSelectReceipt={r => setActiveModal({ id: r.id })} />
         ) : path === '/settings' ? (
-          <SettingsPage account={account} onAccountUpdated={updated=>{setAccount(updated);setCurrency(updated.currency)}} onSignOut={handleSignOut}/>
+          <SettingsPage account={account} onAccountUpdated={updated=>{setAccount(updated);setCurrency(updated.currency);setLang(updated.language)}} onSignOut={handleSignOut}/>
         ) : (
           <Home
             onAddReceipt={() => hiddenFileInputRef.current?.click()}
