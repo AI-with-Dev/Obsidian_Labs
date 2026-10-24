@@ -55,6 +55,8 @@ export const save=(r:Receipt)=>call<Receipt>(`/api/receipts/${r.id}`,json('PATCH
   items:r.items,
   total:r.total,
   category:r.category,
+  type:r.type,
+  transactionType:r.type,
   invoiceNumber:r.invoiceNumber,
   subtotal:r.subtotal,
   tax:r.tax,

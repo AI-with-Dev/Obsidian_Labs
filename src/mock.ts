@@ -21,13 +21,13 @@ const mk=(id:string,vendor:string,date:string,category:string,total:number,statu
 })
 
 let db:Receipt[]=[
-  mk('r1','Sharma Stationery Store (Counter Sale)','2026-10-03','retail_sales',12450,'confirmed',[{name:'Counter sales (retail bills)',amount:12450}],'income'),
-  mk('r2','Gupta Book Depot (Wholesale Collection)','2026-10-06','wholesale_collection',1860,'confirmed',[{name:'Notebooks batch collection',amount:1200},{name:'Packing boxes',amount:660}],'income'),
-  mk('r3','Modern Public School (Bulk Books)','2026-10-09','advance_payment',2400,'confirmed',[{name:'Advance for library books',amount:2400}],'income'),
-  mk('r4','Rajasthan Coaching Academy','2026-10-12','credit_recovery',3120,'confirmed',[{name:'Udhar / Credit settlement',amount:3120}],'income'),
-  mk('r5','Mahalaxmi Stationery (Cash Collection)','','retail_sales',940,'draft',[{name:'General retail cash',amount:940}],'income',{flags:['date']}),
-  mk('r6','Gupta Book Depot (Repeat Entry)','2026-10-06','wholesale_collection',1860,'duplicate',[{name:'Notebooks batch collection',amount:1200},{name:'Packing boxes',amount:660}],'income',{duplicateOfId:'r2'}),
-  mk('r7','City Cargo Tempo (Goods Delivery Fee)','2026-10-14','transport',850,'confirmed',[{name:'Delivery freight to godown',amount:850}],'expense'),
+  mk('r1','Ramesh (Counter Sale)','2026-10-03','retail_sales',12450,'confirmed',[{name:'Counter sales (retail payment)',amount:12450}],'income'),
+  mk('r2','Suresh Bhai (Cash Jama)','2026-10-06','wholesale_collection',500,'confirmed',[{name:'Cash Jama / Payment Received',amount:500}],'income'),
+  mk('r3','Ramesh (Kurkure & Biscuits Udhar)','2026-10-09','other',120,'confirmed',[{name:'Kurkure & Biscuits on credit',amount:120}],'expense'),
+  mk('r4','Mahesh Kumar (Notebooks Udhar)','2026-10-12','other',850,'confirmed',[{name:'Stationery & Notebooks credit',amount:850}],'expense'),
+  mk('r5','Gupta Book Depot (Wholesale Collection)','2026-10-14','wholesale_collection',1860,'confirmed',[{name:'Notebooks batch collection',amount:1200},{name:'Packing boxes',amount:660}],'income'),
+  mk('r6','Kailash Bhai (Local Note)','','retail_sales',250,'draft',[{name:'Dairy items & milk',amount:250}],'expense',{flags:['date']}),
+  mk('r7','Suresh Bhai (Repeat Slip)','2026-10-06','wholesale_collection',500,'duplicate',[{name:'Cash Jama / Payment Received',amount:500}],'income',{duplicateOfId:'r2'}),
 ]
 
 const conf=()=>db.filter(r=>r.status==='confirmed')
@@ -109,6 +109,8 @@ export const m={
   summary:():Summary=>({
     totalReceived:sum(confIncome()),
     totalSpent:sum(confExpense()),
+    totalBorrowed:sum(confExpense()),
+    totalCredit:sum(confExpense()),
     totalBalance:sum(confIncome())-sum(confExpense()),
     confirmedCount:conf().length,
     reviewCount:db.length-conf().length,
@@ -116,16 +118,17 @@ export const m={
     topCustomers:group(r=>r.vendor).slice(0,4).map(g=>({customer:g.key,amount:g.amount}))
   }),
   categories:():CategoryTotal[]=>group(r=>r.category).map(g=>({category:g.key,amount:g.amount})),
-  csv:()=>['Vendor,Date,Category,Currency,Total',...conf().map(r=>`"${r.vendor}",${r.date},${r.category},${r.currency},${r.total}`)].join('\n'),
+  csv:()=>['Party/Vendor,Date,Type,Currency,Total',...conf().map(r=>`"${r.vendor}",${r.date},${r.type||'income'},${r.currency},${r.total}`)].join('\n'),
   pdf:()=>generatePdfDoc(),
   ask:(q:string,lang:Lang):Answer=>{
     const s=q.toLowerCase(),d=dictFor(lang),has=(...w:string[])=>w.some(x=>s.includes(x))
     const A=(k:string,v:Record<string,string|number>,receipts:Receipt[]):Answer=>({answer:d[k].replace(/\{(\w+)\}/g,(_,x)=>String(v[x])),supported:true,receipts})
     const f=(n:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(n)
-    if(has('waiting','review','जांच','जाँच','सत्यापन')){const p=db.filter(r=>r.status!=='confirmed');return A('qa.ans.review',{n:p.length},p)}
+    if(has('waiting','review','जांच','जाँच','सत्यापन','pending')){const p=db.filter(r=>r.status!=='confirmed');return A('qa.ans.review',{n:p.length},p)}
+    if(has('borrowed','credit','udhar','उधार','बाकी','लेन-देन')){const rs=confExpense();return A('qa.ans.borrowed',{amount:f(sum(rs)),n:rs.length},rs)}
     if(has('between','के बीच')){const rs=confIncome().filter(r=>r.date>='2026-10-01'&&r.date<='2026-10-15');return A('qa.ans.dates',{amount:f(sum(rs))},rs)}
-    if(has('customer','shop','vendor','दुकान','ग्राहक')){const g=group(r=>r.vendor)[0];return A('qa.ans.vendor',{name:g.key,amount:f(g.amount)},conf().filter(r=>r.vendor===g.key))}
-    if(has('total','कुल','received','आवक','कमाई'))return A('qa.ans.total',{amount:f(sum(confIncome())),n:confIncome().length},confIncome())
+    if(has('customer','party','shop','vendor','दुकान','ग्राहक','पार्टी')){const g=group(r=>r.vendor)[0];return A('qa.ans.vendor',{name:g.key,amount:f(g.amount)},conf().filter(r=>r.vendor===g.key))}
+    if(has('received','collection','प्राप्त','मिले','जमा','total','कुल','आवक'))return A('qa.ans.received',{amount:f(sum(confIncome())),n:confIncome().length},confIncome())
     return {answer:d['qa.unsupported'],supported:false,receipts:[]}
   }
 }

@@ -173,3 +173,54 @@ def test_extraction_failure_handling(test_setup):
     with get_db(str(temp_db)) as conn:
         row = conn.execute("SELECT status FROM receipts WHERE id = ?", (receipt_id,)).fetchone()
         assert row["status"] == "extraction_failed"
+
+
+def test_extraction_unstructured_handwritten_notes(test_setup):
+    """Test extracting informal local notes like 'Ramesh 20 rupay kurkure' and 'Suresh bhai 500 jama'."""
+    client = TestClient(app)
+
+    # Note 1: Suresh bhai 500 jama (Money Received)
+    up1 = client.post(
+        "/api/receipts/upload",
+        files={"file": ("note_jama.jpg", io.BytesIO(b"\xff\xd8\xffsuresh_jama"), "image/jpeg")},
+    )
+    r1_id = up1.json()["data"]["id"]
+    note1 = ReceiptExtractionResult(
+        party_name="Suresh Bhai",
+        customer_name="Suresh Bhai",
+        total=500.0,
+        items=[],
+        transaction_type="income",
+    )
+    with patch("backend.app.services.receipt_service.extract_receipt_with_gemini") as mock_extract:
+        mock_extract.return_value = (note1, json.dumps(note1.model_dump()))
+        res1 = client.post(f"/api/receipts/{r1_id}/extract")
+        assert res1.status_code == 200
+        d1 = res1.json()["data"]
+        assert d1["vendor"] == "Suresh Bhai"
+        assert d1["total"] == 500.0
+        assert d1["type"] == "income"
+        assert len(d1["items"]) == 1
+        assert "Cash" in d1["items"][0]["name"] or "Jama" in d1["items"][0]["name"]
+
+    # Note 2: Ramesh 20 rupay kurkure (Borrowed items / Credit Udhar)
+    up2 = client.post(
+        "/api/receipts/upload",
+        files={"file": ("note_udhar.jpg", io.BytesIO(b"\xff\xd8\xfframesh_kurkure"), "image/jpeg")},
+    )
+    r2_id = up2.json()["data"]["id"]
+    note2 = ReceiptExtractionResult(
+        party_name="Ramesh",
+        total=20.0,
+        items=[ExtractedLineItem(name="Kurkure", amount=20.0)],
+        transaction_type="expense",
+    )
+    with patch("backend.app.services.receipt_service.extract_receipt_with_gemini") as mock_extract:
+        mock_extract.return_value = (note2, json.dumps(note2.model_dump()))
+        res2 = client.post(f"/api/receipts/{r2_id}/extract")
+        assert res2.status_code == 200
+        d2 = res2.json()["data"]
+        assert d2["vendor"] == "Ramesh"
+        assert d2["total"] == 20.0
+        assert d2["type"] == "expense"
+        assert d2["items"][0]["name"] == "Kurkure"

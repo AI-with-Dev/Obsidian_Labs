@@ -32,6 +32,8 @@ export interface Receipt {
 
 export interface Summary {
   totalSpent: number
+  totalBorrowed?: number
+  totalCredit?: number
   totalReceived?: number
   totalBalance?: number
   confirmedCount: number

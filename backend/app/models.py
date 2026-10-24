@@ -40,6 +40,8 @@ class ReceiptUpdatePayload(BaseModel):
     items: Optional[List[ItemPayload]] = None
     total: Optional[float] = None
     category: Optional[str] = None
+    type: Optional[str] = None
+    transactionType: Optional[str] = None
     invoiceNumber: Optional[str] = None
     subtotal: Optional[float] = None
     tax: Optional[float] = None

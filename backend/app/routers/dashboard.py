@@ -77,6 +77,8 @@ async def get_dashboard_summary(owner: dict = Depends(require_authenticated_owne
 
         return ApiResponse.ok({
             "totalSpent": total_spent,
+            "totalBorrowed": total_spent,
+            "totalCredit": total_spent,
             "totalReceived": total_received,
             "totalBalance": total_balance,
             "confirmedCount": confirmed_count,
