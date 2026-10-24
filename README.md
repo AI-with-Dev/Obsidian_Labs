@@ -1,6 +1,6 @@
 # Vyapar Mitra (व्यापार मित्र — डिजिटल बहीखाता)
 
-A reliable, small-business expense management and receipt auditing web application built for an Indian stationery shop owner.
+A reliable expense-management and receipt-auditing web application for small shop owners across India, designed to support shops in any trade.
 
 The app pairs an accessible React + TypeScript frontend (supporting full English and Hindi) with a Python FastAPI backend powered by Google Gemini for structured receipt extraction. The backend uses a local SQLite database and local files for receipt storage.
 
@@ -154,7 +154,7 @@ python3 -m pytest backend/tests
 ```
 
 ### Reset / Seed Demo Data
-To reset the development database to realistic stationery shop expenses at any time:
+To reset the development database to illustrative small-shop demo expenses at any time:
 ```bash
 backend/.venv/bin/python3 backend/scripts/seed_demo_data.py
 ```
