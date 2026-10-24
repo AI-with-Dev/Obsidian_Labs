@@ -94,12 +94,16 @@ CRITICAL EXTRACTION GUIDELINES FOR LOCAL & HANDWRITTEN NOTES:
 
 def get_gemini_client() -> genai.Client:
     """Return an initialized Google GenAI client."""
-    if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY in {"your_gemini_api_key_here", "your_key_here"}:
+    api_key = settings.GEMINI_API_KEY.strip()
+    if not api_key or api_key in {"your_gemini_api_key_here", "your_key_here"}:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API key is not configured in .env. Please set a valid GEMINI_API_KEY.",
+            detail=(
+                "Gemini is not configured. Set GEMINI_API_KEY in the backend service's "
+                "environment variables and redeploy."
+            ),
         )
-    return genai.Client(api_key=settings.GEMINI_API_KEY)
+    return genai.Client(api_key=api_key)
 
 
 def normalize_category(cat: Optional[str]) -> str:

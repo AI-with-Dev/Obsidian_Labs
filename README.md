@@ -122,6 +122,7 @@ Render Free's filesystem is ephemeral, so configure Supabase as the app's extern
    - `SUPABASE_URL`: the Supabase project URL only, e.g. `https://<project-ref>.supabase.co` (do not append `/rest/v1`)
    - `SUPABASE_SERVICE_ROLE_KEY`: the server-side service-role key
    - `SUPABASE_STORAGE_BUCKET`: `receipt-files` (optional; this is the default)
+   - `GEMINI_API_KEY`: a Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey), required for receipt extraction
 5. Save and redeploy the backend. On startup it creates/verifies a private `receipt-files` bucket. The frontend's existing `VITE_API_BASE_URL` and backend `CORS_ORIGINS` settings remain unchanged.
 
 The backend uses Supabase Postgres for accounts, sessions, and ledger records, and private Supabase Storage for uploaded receipts. Receipt previews are streamed through the authenticated backend; the service-role key is never sent to the browser. Keep the Render service on one instance if running without the external database configuration; when configured as above, the app data is stored outside Render's filesystem.

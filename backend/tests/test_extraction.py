@@ -15,7 +15,30 @@ from backend.app.database import get_db, init_db
 from backend.app.main import app
 from conftest import ensure_test_owner
 from backend.app.routers.auth import require_authenticated_owner
-from backend.app.services.gemini_service import ReceiptExtractionResult, ExtractedLineItem
+from fastapi import HTTPException
+from backend.app.services.gemini_service import (
+    ExtractedLineItem,
+    ReceiptExtractionResult,
+    get_gemini_client,
+)
+
+
+def test_gemini_client_reports_missing_render_environment_key(monkeypatch):
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", " \n ")
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_gemini_client()
+
+    assert "GEMINI_API_KEY" in exc_info.value.detail
+    assert "backend service's environment variables" in exc_info.value.detail
+
+
+def test_gemini_client_trims_environment_key(monkeypatch):
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "  test-gemini-key\n")
+    with patch("backend.app.services.gemini_service.genai.Client") as client:
+        get_gemini_client()
+
+    client.assert_called_once_with(api_key="test-gemini-key")
 
 
 @pytest.fixture(autouse=True)
