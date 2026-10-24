@@ -33,18 +33,18 @@ def sanitize_csv_cell(value: Any) -> str:
 
 
 @router.get("/csv")
-async def export_expenses_csv(owner: dict = Depends(require_authenticated_owner)) -> Response:
+async def export_ledger_csv(owner: dict = Depends(require_authenticated_owner)) -> Response:
     """
-    Export confirmed receipts to CSV format.
+    Export confirmed income and expense receipts to CSV format.
     Ensures formula injection protection and strictly standard RFC 4180 escaping.
     Only receipts with status = 'confirmed' are included.
     """
     with get_db() as conn:
         rows = conn.execute(
             """
-            SELECT vendor, receipt_date, category, currency, total_paise
+            SELECT vendor, receipt_date, transaction_type, category, currency, total_paise
             FROM receipts
-            WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense'
+            WHERE owner_id = ? AND status = 'confirmed'
             ORDER BY receipt_date DESC, created_at DESC;
             """,
             (owner["id"],),
@@ -53,13 +53,12 @@ async def export_expenses_csv(owner: dict = Depends(require_authenticated_owner)
     output = io.StringIO()
     writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL, lineterminator="\r\n")
 
-    # CSV Header matching Claude-built frontend mock
-    writer.writerow(["Vendor", "Date", "Category", "Currency", "Total"])
+    writer.writerow(["Party/Vendor", "Date", "Type", "Currency", "Total"])
 
     for r in rows:
         vendor = sanitize_csv_cell(r["vendor"])
         date = sanitize_csv_cell(r["receipt_date"])
-        category = sanitize_csv_cell(r["category"])
+        transaction_type = sanitize_csv_cell(r["transaction_type"])
         currency = sanitize_csv_cell(r["currency"] or "INR")
         total_val = (
             f"{r['total_paise'] / 100.0:.2f}"
@@ -68,7 +67,7 @@ async def export_expenses_csv(owner: dict = Depends(require_authenticated_owner)
         )
         total = sanitize_csv_cell(total_val)
 
-        writer.writerow([vendor, date, category, currency, total])
+        writer.writerow([vendor, date, transaction_type, currency, total])
 
     csv_text = output.getvalue()
 
@@ -76,7 +75,7 @@ async def export_expenses_csv(owner: dict = Depends(require_authenticated_owner)
         content=csv_text,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": 'attachment; filename="vyapar-mitra-expenses.csv"',
+            "Content-Disposition": 'attachment; filename="vyapar-mitra-ledger.csv"',
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",

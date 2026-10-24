@@ -95,11 +95,16 @@ export async function exportPdf(){
 }
 
 export async function exportCsv(){
-  if(MOCK)throw new Error('CSV export requires the backend API.')
-  const response=await fetch((BASE||'')+'/api/export/csv',{credentials:'include'})
-  if(response.status===401)window.dispatchEvent(new Event('vyapar-mitra:unauthorized'))
-  if(!response.ok)throw new Error('CSV export failed')
-  const blob=await response.blob()
+  let blob:Blob
+  if(MOCK){
+    await wait()
+    blob=new Blob([m.csv()],{type:'text/csv;charset=utf-8'})
+  } else {
+    const response=await fetch((BASE||'')+'/api/export/csv',{credentials:'include'})
+    if(response.status===401)window.dispatchEvent(new Event('vyapar-mitra:unauthorized'))
+    if(!response.ok)throw new Error('CSV export failed')
+    blob=await response.blob()
+  }
   const url=URL.createObjectURL(blob)
   const link=document.createElement('a')
   link.href=url

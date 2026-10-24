@@ -137,7 +137,7 @@ All JSON endpoints follow a consistent envelope structure:
 | `/api/dashboard/summary` | `GET` | Retrieve total spend, confirmed count, pending review count, and top vendors |
 | `/api/dashboard/categories` | `GET` | Retrieve spending aggregated by category |
 | `/api/questions/ask` | `POST` | Ask a supported question (`{ "question": string, "lang": "en" \| "hi" }`) |
-| `/api/export/csv` | `GET` | Download confirmed expense ledger as CSV |
+| `/api/export/csv` | `GET` | Download confirmed income and expense ledger entries as CSV |
 | `/api/export/pdf` | `GET` | Download the payment summary as PDF |
 
 Receipt, dashboard, and export endpoints require an authenticated owner session. The health endpoint and owner setup/login endpoints remain public.

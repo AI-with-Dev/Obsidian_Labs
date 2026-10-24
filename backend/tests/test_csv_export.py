@@ -45,33 +45,40 @@ def test_sanitize_csv_cell_formula_injection():
 
 
 def test_export_empty_csv(client):
-    """Test CSV export when no confirmed receipts exist."""
+    """Test CSV export when no confirmed ledger entries exist."""
     response = client.get("/api/export/csv")
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]
-    assert "vyapar-mitra-expenses.csv" in response.headers["content-disposition"]
+    assert "vyapar-mitra-ledger.csv" in response.headers["content-disposition"]
     
     reader = csv.reader(io.StringIO(response.text))
     rows = list(reader)
     assert len(rows) == 1
-    assert rows[0] == ["Vendor", "Date", "Category", "Currency", "Total"]
+    assert rows[0] == ["Party/Vendor", "Date", "Type", "Currency", "Total"]
 
 
-def test_export_only_confirmed_receipts(client):
-    """Test that only confirmed receipts are exported, ignoring draft/uploaded/discarded."""
+def test_export_confirmed_income_and_expense_entries(client):
+    """Export confirmed income and expenses while excluding unconfirmed receipts."""
     with get_db() as conn:
-        # Confirmed receipt 1
+        # Confirmed expense
         conn.execute(
             """
             INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
             VALUES ('rec_1', 1, 'confirmed', 'Gupta Papers', '2026-10-12', 'inventory', 'INR', 45000, 'path1.jpg', 'r1.jpg', 'hash1', 'image/jpeg');
             """
         )
-        # Confirmed receipt 2
+        # Confirmed expense
         conn.execute(
             """
             INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
             VALUES ('rec_2', 1, 'confirmed', 'Sharma Book Depot', '2026-10-15', 'inventory', 'INR', 125000, 'path2.jpg', 'r2.jpg', 'hash2', 'image/jpeg');
+            """
+        )
+        # Confirmed income
+        conn.execute(
+            """
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, transaction_type, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_income', 1, 'confirmed', 'Ramu Kaka', '2026-10-16', 'retail_sales', 'INR', 10000, 'income', 'path_income.jpg', 'income.jpg', 'hash_income', 'image/jpeg');
             """
         )
         # Needs review (draft)
@@ -102,12 +109,13 @@ def test_export_only_confirmed_receipts(client):
     reader = csv.reader(io.StringIO(response.text))
     rows = list(reader)
 
-    # 1 header + 2 confirmed rows
-    assert len(rows) == 3
-    assert rows[0] == ["Vendor", "Date", "Category", "Currency", "Total"]
-    # Check ordering by receipt_date DESC: Sharma (15th) then Gupta (12th)
-    assert rows[1] == ["Sharma Book Depot", "2026-10-15", "inventory", "INR", "1250.00"]
-    assert rows[2] == ["Gupta Papers", "2026-10-12", "inventory", "INR", "450.00"]
+    # 1 header + 3 confirmed entries
+    assert len(rows) == 4
+    assert rows[0] == ["Party/Vendor", "Date", "Type", "Currency", "Total"]
+    # Entries are sorted by date descending and include both income and expenses.
+    assert rows[1] == ["Ramu Kaka", "2026-10-16", "income", "INR", "100.00"]
+    assert rows[2] == ["Sharma Book Depot", "2026-10-15", "expense", "INR", "1250.00"]
+    assert rows[3] == ["Gupta Papers", "2026-10-12", "expense", "INR", "450.00"]
 
 
 def test_export_formula_injection_and_rfc4180_escaping(client):
@@ -121,8 +129,8 @@ def test_export_formula_injection_and_rfc4180_escaping(client):
         )
         conn.execute(
             """
-            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
-            VALUES ('rec_inj2', 1, 'confirmed', '@Attacker, "Special" Books', '2026-10-09', '+packaging', 'INR', 8500, 'p2.jpg', 'r2.jpg', 'h2', 'image/jpeg');
+            INSERT INTO receipts (id, owner_id, status, vendor, receipt_date, transaction_type, category, currency, total_paise, file_path, file_name, file_hash, mime_type)
+            VALUES ('rec_inj2', 1, 'confirmed', '@Attacker, "Special" Books', '2026-10-09', '+income', '+packaging', 'INR', 8500, 'p2.jpg', 'r2.jpg', 'h2', 'image/jpeg');
             """
         )
         conn.commit()
@@ -139,7 +147,7 @@ def test_export_formula_injection_and_rfc4180_escaping(client):
     assert rows[1][4] == "50.00"
 
     # Row 2: '@Attacker, "Special" Books' should be neutralized to "'@Attacker, \"Special\" Books"
-    # and '+packaging' should be neutralized to "'+packaging"
+    # and a formula-like transaction type should also be neutralized.
     assert rows[2][0] == '\'@Attacker, "Special" Books'
-    assert rows[2][2] == "'+packaging"
+    assert rows[2][2] == "'+income"
     assert rows[2][4] == "85.00"
