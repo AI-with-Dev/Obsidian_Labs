@@ -12,6 +12,7 @@ from fastapi import HTTPException, UploadFile, status
 from backend.app.config import settings
 from backend.app.database import get_db
 from backend.app.models import ReceiptUpdatePayload
+from backend.app.storage import delete_object, download_object, upload_object
 
 logger = logging.getLogger("shopledger.receipts")
 
@@ -123,10 +124,14 @@ async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
     # Generate unique receipt ID
     receipt_id = f"rec_{uuid.uuid4().hex[:12]}"
 
-    # Save to disk
     stored_filename = f"{receipt_id}_{safe_name}"
-    target_path = settings.upload_dir_resolved / stored_filename
-    target_path.write_bytes(content)
+    if settings.uses_supabase_storage:
+        stored_path = f"{owner_id}/{stored_filename}"
+        upload_object(stored_path, content, content_type)
+    else:
+        target_path = settings.upload_dir_resolved / stored_filename
+        target_path.write_bytes(content)
+        stored_path = str(target_path)
 
     # Check for exact duplicate by SHA-256 hash
     duplicate_of_id = None
@@ -159,7 +164,7 @@ async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
             (
                 receipt_id,
                 owner_id,
-                str(target_path),
+                stored_path,
                 safe_name,
                 file_hash,
                 content_type,
@@ -191,7 +196,7 @@ async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
     return receipt_id
 
 
-def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path, str, str]:
+def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path | bytes, str, str]:
     """Retrieve file path, mime type, and filename for an existing receipt."""
     with get_db() as conn:
         row = conn.execute(
@@ -205,13 +210,15 @@ def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path, str, str
                 detail=f"Receipt with ID '{receipt_id}' not found.",
             )
 
+        if settings.uses_supabase_storage:
+            file_content = download_object(row["file_path"])
+            return file_content, row["mime_type"], row["file_name"]
         file_path = Path(row["file_path"])
         if not file_path.is_file():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Receipt file not found on disk.",
             )
-
         return file_path, row["mime_type"], row["file_name"]
 
 
@@ -229,15 +236,23 @@ def delete_receipt(receipt_id: str, owner_id: int = 1) -> None:
                 detail=f"Receipt with ID '{receipt_id}' not found.",
             )
 
-        file_path = Path(row["file_path"])
-        upload_dir = settings.upload_dir_resolved.resolve()
-        if file_path.resolve().parent != upload_dir:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Receipt file is outside the configured uploads directory.",
-            )
+        if settings.uses_supabase_storage:
+            stored_path = row["file_path"]
+        else:
+            file_path = Path(row["file_path"])
+            upload_dir = settings.upload_dir_resolved.resolve()
+            if file_path.resolve().parent != upload_dir:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Receipt file is outside the configured uploads directory.",
+                )
+            stored_path = None
 
         conn.execute("DELETE FROM receipts WHERE id = ? AND owner_id = ?;", (receipt_id, owner_id))
+
+    if stored_path is not None:
+        delete_object(stored_path)
+        return
 
     try:
         file_path.unlink(missing_ok=True)
@@ -341,7 +356,7 @@ async def perform_receipt_extraction(
     owner_id: int = 1,
 ) -> dict:
     """Run structured Gemini extraction on receipt file, check duplicates, save to DB, and return Receipt shape."""
-    file_path, mime_type, _ = get_receipt_file(receipt_id, owner_id)
+    file_content, mime_type, file_name = get_receipt_file(receipt_id, owner_id)
 
     # Mark as extracting
     with get_db() as conn:
@@ -351,7 +366,7 @@ async def perform_receipt_extraction(
         )
 
     try:
-        extraction, raw_json = extract_receipt_with_gemini(file_path, mime_type)
+        extraction, raw_json = extract_receipt_with_gemini(file_content, mime_type, file_name)
     except Exception as e:
         with get_db() as conn:
             conn.execute(

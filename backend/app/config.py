@@ -9,8 +9,12 @@ class Settings(BaseSettings):
 
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    DATABASE_URL: str = ""
     DATABASE_PATH: str = "backend/data/shopledger.db"
     UPLOAD_DIR: str = "backend/data/uploads"
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_STORAGE_BUCKET: str = "receipt-files"
     MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MB
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
@@ -44,6 +48,14 @@ class Settings(BaseSettings):
             p = base_dir / p
         p.mkdir(parents=True, exist_ok=True)
         return p
+
+    @property
+    def uses_supabase_database(self) -> bool:
+        return bool(self.DATABASE_URL.strip())
+
+    @property
+    def uses_supabase_storage(self) -> bool:
+        return bool(self.SUPABASE_URL.strip() and self.SUPABASE_SERVICE_ROLE_KEY.strip())
 
 
 settings = Settings()
