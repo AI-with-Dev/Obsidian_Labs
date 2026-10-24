@@ -4,7 +4,7 @@ import * as api from './api'
 import {Account} from './api'
 import {AuthPage,SettingsPage} from './account'
 import {VyaparMitraLogo} from './components/VyaparMitraLogo'
-import {CATEGORIES,Receipt,Item,Filters,Answer} from './types'
+import {Receipt,Item,Filters,Answer} from './types'
 
 // Reusable SVG Icons for clear, simple visual guidance
 function StoreIcon({className="w-5 h-5"}:{className?:string}){
@@ -62,17 +62,6 @@ const field = 'w-full min-h-[48px] sm:min-h-[50px] px-3.5 sm:px-4 rounded-xl bor
 const card = 'block rounded-2xl bg-white border-2 border-stone-200/90 shadow-2xs hover:shadow-xs transition-all p-5 sm:p-6'
 const h1 = 'text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 mb-1'
 const h2 = 'text-xl sm:text-2xl font-bold tracking-tight text-stone-900 mb-4'
-
-// Subtle category pill colors for easy recognition
-const catColors: Record<string, string> = {
-  inventory: 'bg-emerald-50 text-emerald-800 border-emerald-200/70',
-  packaging: 'bg-amber-50 text-amber-800 border-amber-200/70',
-  transport: 'bg-blue-50 text-blue-800 border-blue-200/70',
-  utilities: 'bg-teal-50 text-teal-800 border-teal-200/70',
-  rent: 'bg-purple-50 text-purple-800 border-purple-200/70',
-  repairs: 'bg-rose-50 text-rose-800 border-rose-200/70',
-  other: 'bg-stone-100 text-stone-700 border-stone-200/70',
-}
 
 const OK = ['image/jpeg', 'image/png', 'application/pdf']
 
@@ -172,10 +161,6 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
                 </b>
                 <div className="flex items-center flex-wrap gap-2 text-sm text-stone-500 mt-0.5">
                   <span>{r.date ? day(r.date, lang) : '—'}</span>
-                  <span>•</span>
-                  <span className={`px-2 py-0.5 rounded-xs text-xs font-medium border ${catColors[r.category] || catColors.other}`}>
-                    {t('cat.' + r.category)}
-                  </span>
                 </div>
               </div>
             </div>
@@ -196,37 +181,6 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
         </li>
       ))}
     </ul>
-  )
-}
-
-function CategoryBreakdown({ rows, total }: { rows: { label: string; amount: number; href: string }[]; total: number }){
-  const { lang,currency } = useI18n()
-  if (!rows.length) return null
-  return (
-    <div className="space-y-2.5">
-      {rows.map(r => {
-        const pct = total > 0 ? Math.round((r.amount / total) * 100) : 0
-        return (
-          <a
-            key={r.label}
-            href={r.href}
-            className={`${card} p-4 sm:p-5 hover:border-emerald-700/50 hover:shadow-sm transition-all group block`}
-          >
-            <div className="flex justify-between items-center gap-2 mb-2 text-base">
-              <span className="font-semibold text-stone-800 group-hover:text-emerald-800 transition-colors">{r.label}</span>
-              <span className="font-bold text-stone-900">{money(r.amount, lang,currency)}</span>
-            </div>
-            <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-emerald-600 group-hover:bg-emerald-700 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(pct, 100)}%` }}
-              />
-            </div>
-            <span className="text-xs text-stone-500 mt-1 block">{pct}% of total</span>
-          </a>
-        )
-      })}
-    </div>
   )
 }
 
@@ -276,7 +230,6 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [vendor, setVendor] = useState('')
   const [date, setDate] = useState('')
-  const [category, setCategory] = useState('inventory')
   const [currency, setCurrency] = useState('INR')
   const [items, setItems] = useState<Item[]>([])
   const [total, setTotal] = useState<string>('')
@@ -292,7 +245,6 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
     setReceipt(r)
     setVendor(r.vendor || '')
     setDate(r.date || '')
-    setCategory(r.category || 'inventory')
     setCurrency(r.currency || 'INR')
     setItems(r.items && r.items.length ? r.items.map(it => ({
       name: it.name || '',
@@ -438,7 +390,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
         vendor: trimmedVendor,
         date: trimmedDate,
         currency: currency || 'INR',
-        category: category || 'inventory',
+        category: receipt?.category || 'inventory',
         items: items
           .map(it => ({
             name: it.name.trim() || 'Item',
@@ -615,7 +567,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
                 <span>{t('rv.warn')}</span>
               </div>
 
-              {/* 1. Essential Ledger Entry: Shop Name, Date, Category */}
+              {/* 1. Essential Ledger Entry: Shop Name, Date */}
               <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-3.5">
                 <div className="border-b border-stone-200 pb-2">
                   <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
@@ -640,40 +592,19 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
                   </label>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block">
-                      <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
-                        {t('rv.date')} <span className="text-emerald-700 font-black">*</span>
-                      </span>
-                      <input
-                        type="date"
-                        className={field}
-                        value={date}
-                        onChange={e => setDate(e.target.value)}
-                        required
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block">
-                      <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
-                        {t('rv.category')}
-                      </span>
-                      <select
-                        className={field}
-                        value={category}
-                        onChange={e => setCategory(e.target.value)}
-                      >
-                        {CATEGORIES.map(c => (
-                          <option key={c} value={c}>
-                            {t('cat.' + c)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
+                <div>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm sm:text-base font-bold text-stone-900">
+                      {t('rv.date')} <span className="text-emerald-700 font-black">*</span>
+                    </span>
+                    <input
+                      type="date"
+                      className={field}
+                      value={date}
+                      onChange={e => setDate(e.target.value)}
+                      required
+                    />
+                  </label>
                 </div>
               </div>
 
@@ -812,15 +743,14 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
   const { t, lang,currency } = useI18n()
   const q = useLoad(() => Promise.all([
     api.summary(),
-    api.categories(),
     api.list({ status: 'pending' }),
     api.list({ status: 'confirmed' })
   ]), [refreshKey])
-  const s = q.d?.[0], c = q.d?.[1], p = q.d?.[2], confirmed = q.d?.[3]
+  const s = q.d?.[0], p = q.d?.[1], confirmed = q.d?.[2]
 
   return (
     <State {...q}>
-      {s && c && p && (
+      {s && p && (
         <div className="space-y-8">
           {/* Welcoming Dashboard Greeting & Prominent Action Button */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -976,21 +906,15 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
             )}
           </section>
 
-          {/* Spending Analytics: Categories & Top Vendors */}
-          <div className="grid gap-6 md:grid-cols-2">
+          {/* Top Vendors / Suppliers */}
+          {s.topVendors && s.topVendors.length > 0 && (
             <section>
-              <h2 className={h2}>{t('home.cats')}</h2>
-              <CategoryBreakdown
-                rows={c.map(x => ({
-                  label: t('cat.' + x.category),
-                  amount: x.amount,
-                  href: `#/ledger?category=${x.category}`
-                }))}
-                total={s.totalSpent ?? s.totalReceived ?? 0}
-              />
-            </section>
-            <section>
-              <h2 className={h2}>{t('home.vendors')}</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className={h2}>{t('home.vendors')}</h2>
+                <a href="#/ledger" className="text-sm font-semibold text-emerald-800 hover:underline">
+                  {t('home.viewAll')} →
+                </a>
+              </div>
               <TopVendorsList
                 rows={s.topVendors.map(v => ({
                   label: v.vendor,
@@ -999,7 +923,7 @@ function Home({ onAddReceipt, onSelectReceipt, refreshKey }: { onAddReceipt: () 
                 }))}
               />
             </section>
-          </div>
+          )}
         </div>
       )}
     </State>
@@ -1069,8 +993,8 @@ function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
 function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
   const { t, lang } = useI18n()
   const p = new URLSearchParams(query)
-  const blank: Filters = { q: '', from: '', to: '', category: '', vendor: '' }
-  const [fl, setFl] = useState<Filters>({ ...blank, category: p.get('category') || '', vendor: p.get('vendor') || '' })
+  const blank: Filters = { q: '', from: '', to: '', vendor: '' }
+  const [fl, setFl] = useState<Filters>({ ...blank, vendor: p.get('vendor') || '' })
   const [ex, setEx] = useState<'idle' | 'busy' | 'ok' | 'err'>('idle')
 
   const vendors = useLoad(() => api.summary(), [refreshKey])
@@ -1115,8 +1039,8 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
       </div>
 
       {/* Filter controls */}
-      <div className={`${card} grid gap-4 sm:grid-cols-2 lg:grid-cols-3`}>
-        <div className="sm:col-span-2 lg:col-span-1">
+      <div className={`${card} grid gap-4 sm:grid-cols-2 lg:grid-cols-4`}>
+        <div className="sm:col-span-2">
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.search')}</span>
             <div className="relative">
@@ -1134,17 +1058,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
           </label>
         </div>
 
-        <div>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.category')}</span>
-            <select className={field} value={fl.category} onChange={e => up('category', e.target.value)}>
-              <option value="">{t('cat.all')}</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{t('cat.' + c)}</option>)}
-            </select>
-          </label>
-        </div>
-
-        <div>
+        <div className="sm:col-span-2">
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-stone-800">{t('lg.vendor')}</span>
             <select className={field} value={fl.vendor} onChange={e => up('vendor', e.target.value)}>
@@ -1168,7 +1082,7 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
           </label>
         </div>
 
-        <div className="flex items-end">
+        <div className="flex items-end sm:col-span-2 lg:col-span-2">
           <button className={`${ghost} w-full`} onClick={() => setFl(blank)}>
             {t('lg.clear')}
           </button>
@@ -1261,7 +1175,7 @@ function Ask({ onSelectReceipt }: { onSelectReceipt: (r: Receipt) => void }){
           {lang === 'hi' ? 'सुझाव (पूछने के लिए छुएँ)' : 'Suggested Questions (Tap to ask)'}
         </span>
         <div className="flex flex-col gap-2">
-          {[1, 2, 3, 4, 5].map(n => (
+          {[1, 3, 4, 5].map(n => (
             <button
               key={n}
               className={`${ghost} text-left text-stone-700 hover:text-emerald-900 hover:border-emerald-700/60 justify-start py-3 px-4 text-sm sm:text-base`}
@@ -1321,7 +1235,6 @@ export default function App(){
 
   // Header state & click-outside detection
   const [menuOpen, setMenuOpen] = useState(false)
-  const [exportingPdf, setExportingPdf] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
 
   // Close mobile dropdown menu on click outside or Escape key
@@ -1422,33 +1335,6 @@ export default function App(){
     }
   }
 
-  const changeLanguage = async () => {
-    if(!account)return
-    const language=lang==='en'?'hi':'en'
-    try{
-      const updated=await api.saveProfile({...account,language})
-      setAccount(updated)
-      setLang(updated.language)
-    }catch(error){
-      setToastMessage(error instanceof Error?error.message:t('settings.saveError'))
-      setTimeout(()=>setToastMessage(null),5000)
-    }
-  }
-
-  const handleExportPdf = async () => {
-    try {
-      setExportingPdf(true)
-      await api.exportPdf()
-      setToastMessage(t('settings.exported'))
-      setTimeout(() => setToastMessage(null), 4000)
-    } catch {
-      setToastMessage(t('settings.exportError'))
-      setTimeout(() => setToastMessage(null), 4000)
-    } finally {
-      setExportingPdf(false)
-    }
-  }
-
   const nav = [
     { p: '/', k: 'nav.home', icon: StoreIcon },
     { p: '/upload', k: 'nav.upload', icon: PlusIcon },
@@ -1509,13 +1395,13 @@ export default function App(){
         />
       )}
 
-      {/* Top Header Bar - Responsive Adaptive Mobile & Desktop Navigation */}
+      {/* Top Header Bar - Clean, Left-Aligned Logo & Responsive Navigation */}
       <header
         ref={headerRef}
         className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all"
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4 py-2.5">
-          {/* Brand Logo & Typography Lockup */}
+        <div className="w-full flex items-center justify-between px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3">
+          {/* Brand Logo strictly pinned to the far left corner */}
           <a
             href="#/"
             onClick={() => setMenuOpen(false)}
@@ -1550,7 +1436,7 @@ export default function App(){
             </div>
           </a>
 
-          {/* Laptop & Desktop Layout (640px and wider): Full horizontal inline navigation */}
+          {/* Laptop & Desktop Layout (640px and wider): Clean horizontal navigation tabs */}
           <nav aria-label={t('nav.label')} className="hidden sm:flex items-center gap-1 md:gap-1.5 lg:gap-2">
             {nav.map(item => {
               const active = path === item.p
@@ -1560,7 +1446,7 @@ export default function App(){
                   key={item.p}
                   href={'#' + item.p}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs md:text-sm font-semibold transition-all duration-150 select-none ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-150 select-none ${
                     active
                       ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs'
                       : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
@@ -1573,33 +1459,6 @@ export default function App(){
             })}
           </nav>
 
-          {/* Desktop Right Quick Actions (Export PDF & Language Switcher) */}
-          <div className="hidden sm:flex items-center gap-1.5 md:gap-2 border-l border-stone-200/80 pl-2 md:pl-3">
-            <button
-              type="button"
-              disabled={exportingPdf}
-              onClick={handleExportPdf}
-              aria-label={t('nav.exportPdf')}
-              title={t('nav.exportPdf')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs border border-stone-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/70 text-stone-700 hover:text-emerald-900 text-xs md:text-sm font-semibold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-            >
-              <DownloadIcon className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-              <span className="hidden lg:inline">{t('nav.exportPdf')}</span>
-              <span className="lg:hidden">PDF</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void changeLanguage()}
-              aria-label={t('lang.label')}
-              title={t('lang.label')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs border border-stone-200 hover:border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-xs md:text-sm font-semibold shadow-2xs transition-all cursor-pointer"
-            >
-              <span className="text-sm leading-none">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
-              <span>{t('lang.other')}</span>
-            </button>
-          </div>
-
           {/* Mobile Layout (< 640px / sm): Hamburger toggle button on the right */}
           <div className="flex sm:hidden items-center gap-2">
             <button
@@ -1607,7 +1466,7 @@ export default function App(){
               onClick={() => setMenuOpen(!menuOpen)}
               aria-expanded={menuOpen}
               aria-label={t('nav.label')}
-              className={`flex items-center justify-center p-2 rounded-xs border font-semibold shadow-2xs cursor-pointer transition-all active:scale-95 ${
+              className={`flex items-center justify-center p-2 rounded-xl border font-semibold shadow-2xs cursor-pointer transition-all active:scale-95 ${
                 menuOpen
                   ? 'bg-emerald-50 text-emerald-900 border-emerald-300 ring-2 ring-emerald-500/20'
                   : 'bg-white hover:bg-stone-50 border-stone-300 text-stone-800 hover:border-emerald-600/40'
@@ -1629,8 +1488,7 @@ export default function App(){
             role="dialog"
             aria-label={t('nav.label')}
           >
-            <div className="px-4 py-3 space-y-3">
-              {/* Navigation links list */}
+            <div className="px-4 py-3">
               <nav aria-label={t('nav.label')} className="flex flex-col space-y-1">
                 {nav.map(item => {
                   const active = path === item.p
@@ -1641,7 +1499,7 @@ export default function App(){
                       href={'#' + item.p}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xs text-sm font-semibold transition-colors active:scale-[0.99] ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors active:scale-[0.99] ${
                         active
                           ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs'
                           : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50 border border-transparent'
@@ -1656,43 +1514,6 @@ export default function App(){
                   )
                 })}
               </nav>
-
-              {/* Action triggers: Export PDF & Language Switcher */}
-              <div className="pt-2.5 border-t border-stone-200 flex flex-col gap-2">
-                <button
-                  type="button"
-                  disabled={exportingPdf}
-                  onClick={() => {
-                    setMenuOpen(false)
-                    void handleExportPdf()
-                  }}
-                  className="flex items-center justify-between w-full px-3 py-2.5 rounded-xs border border-stone-200 hover:border-emerald-300 bg-stone-50 hover:bg-emerald-50 text-stone-800 hover:text-emerald-900 text-sm font-semibold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <DownloadIcon className="w-4 h-4 text-emerald-700 shrink-0" />
-                    <span>{t('nav.exportPdf')}</span>
-                  </div>
-                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">PDF</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    void changeLanguage()
-                  }}
-                  className="flex items-center justify-between w-full px-3 py-2.5 rounded-xs border border-stone-200 hover:border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold transition-colors shadow-2xs cursor-pointer"
-                  aria-label={t('lang.label')}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base leading-none">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
-                    <span>{t('lang.label')}: {t('lang.other')}</span>
-                  </div>
-                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wide">
-                    {lang === 'en' ? 'हिन्दी' : 'English'}
-                  </span>
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -1712,7 +1533,7 @@ export default function App(){
         ) : path === '/ask' ? (
           <Ask onSelectReceipt={r => setActiveModal({ id: r.id })} />
         ) : path === '/settings' ? (
-          <SettingsPage account={account} onAccountUpdated={updated=>{setAccount(updated);setCurrency(updated.currency)}} onSignOut={handleSignOut}/>
+          <SettingsPage account={account} onAccountUpdated={updated=>{setAccount(updated);setCurrency(updated.currency);setLang(updated.language)}} onSignOut={handleSignOut}/>
         ) : (
           <Home
             onAddReceipt={() => hiddenFileInputRef.current?.click()}
