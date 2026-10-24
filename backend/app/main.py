@@ -1,11 +1,5 @@
-import sys
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
-
-repository_root = str(Path(__file__).resolve().parents[2])
-if repository_root not in sys.path:
-    sys.path.insert(0, repository_root)
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -16,7 +10,6 @@ from backend.app.config import settings
 from backend.app.database import get_db, init_db
 from backend.app.models import ApiResponse
 from backend.app.routers.auth import require_authenticated_owner, router as auth_router
-from backend.app.storage import ensure_storage_bucket, validate_storage_configuration
 
 # Configure server-side logging
 logging.basicConfig(
@@ -29,13 +22,9 @@ logger = logging.getLogger("shopledger.backend")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle event handler for FastAPI."""
-    logger.info("Initializing Vyapar Mitra database and storage...")
-    validate_storage_configuration()
-    if settings.uses_supabase_storage:
-        ensure_storage_bucket()
+    logger.info("Initializing Vyapar Mitra database and local storage...")
     init_db()
-    if not settings.uses_supabase_storage:
-        settings.upload_dir_resolved.mkdir(parents=True, exist_ok=True)
+    settings.upload_dir_resolved.mkdir(parents=True, exist_ok=True)
     logger.info("Backend initialization complete.")
     yield
     logger.info("Vyapar Mitra backend shutting down.")
@@ -101,23 +90,6 @@ async def generic_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Health Check Endpoint
-@app.get("/")
-async def root_health_check():
-    """Respond to hosting platforms that probe the application root."""
-    return {
-        "status": "ok",
-        "service": "Vyapar Mitra API",
-        "frontend": "hosted separately",
-    }
-
-
-@app.get("/script-health-check")
-async def streamlit_script_health_check():
-    """Respond to Streamlit Community Cloud's script health probe."""
-    return {"status": "ok"}
-
-
 @app.get("/api/health", response_model=ApiResponse[dict])
 async def health_check():
     """Verify backend and database health."""
@@ -134,23 +106,6 @@ async def health_check():
         "database": db_status,
         "version": "0.1.0",
     })
-
-
-@app.get("/healthz")
-async def streamlit_health_check():
-    """Provide the plain HTTP health endpoint expected by Streamlit hosting."""
-    try:
-        with get_db() as conn:
-            conn.execute("SELECT 1;").fetchone()
-    except Exception as exc:
-        logger.error("Streamlit health check database failure: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"status": "unhealthy"},
-        )
-    return {"status": "ok"}
-
-
 # Routers
 from backend.app.routers.receipts import router as receipts_router
 from backend.app.routers.dashboard import router as dashboard_router

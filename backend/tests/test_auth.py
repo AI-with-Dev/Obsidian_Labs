@@ -82,7 +82,7 @@ def test_first_run_setup_and_login_protection(client):
     assert logged_in.json()["data"]["account"]["email"] == ACCOUNT["email"]
 
 
-def test_https_cross_origin_session_cookie(client):
+def test_https_session_cookie_remains_secure_and_same_site(client):
     https_client = TestClient(app, base_url="https://api.example.com")
     response = https_client.post(
         "/api/auth/setup",
@@ -92,7 +92,7 @@ def test_https_cross_origin_session_cookie(client):
 
     assert response.status_code == 201
     cookie = response.headers["set-cookie"].lower()
-    assert "samesite=none" in cookie
+    assert "samesite=lax" in cookie
     assert "secure" in cookie
     assert "httponly" in cookie
     assert https_client.get("/api/auth/status").json()["data"]["authenticated"] is True

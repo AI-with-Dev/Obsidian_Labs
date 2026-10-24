@@ -2,7 +2,7 @@
 
 A reliable, small-business expense management and receipt auditing web application built for an Indian stationery shop owner.
 
-The app pairs an accessible React + TypeScript frontend (supporting full English and Hindi) with a Python FastAPI backend powered by Google Gemini for structured receipt extraction. The backend uses SQLite and local files for development, or Supabase Postgres and private Supabase Storage when configured.
+The app pairs an accessible React + TypeScript frontend (supporting full English and Hindi) with a Python FastAPI backend powered by Google Gemini for structured receipt extraction. The backend uses a local SQLite database and local files for receipt storage.
 
 ---
 
@@ -36,7 +36,7 @@ The app pairs an accessible React + TypeScript frontend (supporting full English
 ├── implementation_plan.md          # Full architectural plan & 12-step build order
 ├── task_list.md                    # Step-by-step progress tracking
 ├── README.md                       # Project documentation
-├── .env.example                    # Global environment configuration template
+├── .env.example                    # Local environment configuration template
 ├── package.json                    # Frontend dependencies & scripts
 ├── vite.config.ts                  # Vite build config with Tailwind v4 & proxy
 ├── tsconfig.json                   # TypeScript config
@@ -53,17 +53,14 @@ The app pairs an accessible React + TypeScript frontend (supporting full English
 │       ├── en.json                 # English copy dictionary
 │       └── hi.json                 # Hindi copy dictionary
 └── backend/                        # Python FastAPI Backend (Steps 1-11)
-    ├── .env.example                # Backend environment template
     ├── requirements.txt            # Python dependencies
     ├── app/
     │   ├── main.py                 # FastAPI application
-    │   ├── config.py               # Settings & environment validation
-    │   ├── database.py             # SQLite and Supabase Postgres database access
-    │   ├── storage.py              # Local or private Supabase receipt-file storage
+    │   ├── config.py               # Local settings & environment configuration
+    │   ├── database.py             # Local SQLite database access
     │   ├── models.py               # Pydantic schemas
     │   ├── services/               # Extraction, duplicate, dashboard & question logic
     │   └── routers/                # REST API route handlers
-    ├── migrate_sqlite_to_supabase.py # Optional legacy data migration utility
     └── data/
         ├── shopledger.db           # SQLite database
         └── uploads/                # Stored receipt images & PDFs
@@ -106,42 +103,11 @@ python backend/run_server.py
 ```
 The backend API server runs at [http://localhost:8000](http://localhost:8000). Interactive OpenAPI documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-### Streamlit Community Cloud (FastAPI backend)
-
-To host the FastAPI API on Streamlit Community Cloud, set **Main file path** to `main.py` in the repository root. This root-level ASGI entry point exposes the backend app and responds to Streamlit's root and script health probes; it does not host the React/Vite frontend, which must still be deployed separately. Configure `GEMINI_API_KEY` in Streamlit's app secrets/environment settings if receipt extraction is needed.
-
-### Render data persistence
-
-Render Free's filesystem is ephemeral, so configure Supabase as the app's external database and private receipt-file store:
-
-1. Create a Supabase project.
-2. In **Project Settings → Database**, copy a PostgreSQL connection URI. Use the Supabase pooler connection string for Render and keep its password private.
-3. In **Project Settings → API**, copy the project URL and the server-side `service_role` key. Never use the service-role key in frontend variables or commit it to source control.
-4. In Render, open the backend Web Service's **Environment** page and add:
-   - `DATABASE_URL`: the Supabase PostgreSQL connection URI
-   - `SUPABASE_URL`: the Supabase project URL only, e.g. `https://<project-ref>.supabase.co` (do not append `/rest/v1`)
-   - `SUPABASE_SERVICE_ROLE_KEY`: the server-side service-role key
-   - `SUPABASE_STORAGE_BUCKET`: `receipt-files` (optional; this is the default)
-   - `GEMINI_API_KEY`: a Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey), required for receipt extraction
-5. Save and redeploy the backend. On startup it creates/verifies a private `receipt-files` bucket. The frontend's existing `VITE_API_BASE_URL` and backend `CORS_ORIGINS` settings remain unchanged.
-
-The backend uses Supabase Postgres for accounts, sessions, and ledger records, and private Supabase Storage for uploaded receipts. Receipt previews are streamed through the authenticated backend; the service-role key is never sent to the browser. Keep the Render service on one instance if running without the external database configuration; when configured as above, the app data is stored outside Render's filesystem.
-
-Setting these variables does not automatically copy data from an existing SQLite database or Render filesystem. If your SQLite database and receipt files are available, back them up and run the included migration utility from the repository root in an environment where the four Supabase settings above are configured:
-
-```bash
-python -m backend.migrate_sqlite_to_supabase \
-  --sqlite-path backend/data/shopledger.db \
-  --uploads-path backend/data/uploads
-```
-
-The utility refuses to import into a Supabase database that already contains accounts or receipts. It uploads receipt files before importing database rows, and can safely retry those file uploads if the database import fails. It does not migrate login sessions, so users will need to sign in again. Do not run it against a database while the app is actively writing to that same SQLite file. Render Free may not provide a way to recover files after its ephemeral filesystem has been reset; if they are unavailable, they cannot be reconstructed by this migration.
-
 ### First sign-in
 
 Create an account with your name, email, business details, preferred language, display currency, and a password. Each account has its own private ledger; sign out to switch accounts, or sign into the same account on another device to access its data there. Passwords must be at least 12 characters and include uppercase and lowercase letters, a number, and a symbol; signup also asks you to confirm the password. The backend stores only a salted PBKDF2 password hash and issues an HTTP-only session cookie. Email/OTP verification is not enabled because this project has no email delivery service configured.
 
-After setup, use the email and password to sign in. The **Settings** page lets you edit your profile, language and display currency, change your password, export CSV/PDF reports, or sign out. Changing your password revokes other sessions. Currency selection changes display formatting only; it does not perform exchange-rate conversion. When the frontend and API are hosted on separate HTTPS origins, the HTTP-only session cookie uses `SameSite=None; Secure` so the browser can send it with credentialed API requests.
+After setup, use the email and password to sign in. The **Settings** page lets you edit your profile, language and display currency, change your password, export CSV/PDF reports, or sign out. Changing your password revokes other sessions. Currency selection changes display formatting only; it does not perform exchange-rate conversion. Receipt files and account data stay in the configured local data directories.
 
 ---
 

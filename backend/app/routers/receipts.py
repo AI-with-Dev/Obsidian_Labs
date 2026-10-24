@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, File, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 
 from backend.app.routers.auth import require_authenticated_owner
 from backend.app.models import ApiResponse
@@ -34,12 +34,6 @@ async def stream_receipt_file(
 ):
     """Retrieve and stream the stored receipt image or PDF file."""
     file_path, mime_type, file_name = get_receipt_file(id, owner["id"])
-    if isinstance(file_path, bytes):
-        return Response(
-            content=file_path,
-            media_type=mime_type,
-            headers={"Content-Disposition": f'inline; filename="{file_name}"'},
-        )
     return FileResponse(
         path=str(file_path),
         media_type=mime_type,

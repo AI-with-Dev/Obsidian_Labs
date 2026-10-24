@@ -9,13 +9,6 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
-try:
-    import psycopg
-except ImportError:
-    class _DummyPsycopg:
-        IntegrityError = type("IntegrityError", (Exception,), {})
-    psycopg = _DummyPsycopg()
-
 from backend.app.database import get_db
 from backend.app.models import ApiResponse
 
@@ -25,17 +18,6 @@ SESSION_COOKIE = "shopledger_session"
 SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 PASSWORD_ITERATIONS = 310_000
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-def _cookie_security(request: Request) -> tuple[bool, str]:
-    origin = request.headers.get("origin", "")
-    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
-    secure = (
-        request.url.scheme == "https"
-        or forwarded_proto == "https"
-        or origin.startswith("https://")
-    )
-    return secure, "none" if secure else "lax"
 
 
 class AccountInput(BaseModel):
@@ -135,7 +117,6 @@ def _new_session(owner_id: int, response: Response, request: Request) -> None:
     token = secrets.token_urlsafe(32)
     expires_at = int(time.time()) + SESSION_TTL_SECONDS
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    secure, samesite = _cookie_security(request)
     with get_db() as conn:
         conn.execute(
             "INSERT INTO login_sessions(token_hash, owner_id, expires_at) VALUES (?, ?, ?)",
@@ -146,8 +127,8 @@ def _new_session(owner_id: int, response: Response, request: Request) -> None:
         token,
         max_age=SESSION_TTL_SECONDS,
         httponly=True,
-        secure=secure,
-        samesite=samesite,
+        secure=request.url.scheme == "https",
+        samesite="lax",
         path="/api",
     )
 
@@ -229,7 +210,7 @@ async def setup_account(payload: AccountInput, request: Request, response: Respo
                 ),
             )
             owner_id = conn.execute("SELECT id FROM shop_owner WHERE email = ?", (payload.email.strip().lower(),)).fetchone()["id"]
-    except (sqlite3.IntegrityError, psycopg.IntegrityError) as exc:
+    except sqlite3.IntegrityError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email address already exists.",
@@ -261,13 +242,12 @@ async def logout(request: Request, response: Response):
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         with get_db() as conn:
             conn.execute("DELETE FROM login_sessions WHERE token_hash = ?", (token_hash,))
-    secure, samesite = _cookie_security(request)
     response.delete_cookie(
         SESSION_COOKIE,
         path="/api",
         httponly=True,
-        secure=secure,
-        samesite=samesite,
+        secure=request.url.scheme == "https",
+        samesite="lax",
     )
     return ApiResponse.ok({"signedOut": True})
 
@@ -330,7 +310,7 @@ async def update_profile(payload: AccountUpdate, owner: dict = Depends(require_a
                 "SELECT * FROM shop_owner WHERE id = ?",
                 (owner["id"],),
             ).fetchone()
-    except (sqlite3.IntegrityError, psycopg.IntegrityError) as exc:
+    except sqlite3.IntegrityError as exc:
         raise HTTPException(status_code=409, detail="That email address is already in use.") from exc
     return ApiResponse.ok(_account_payload(row))
 

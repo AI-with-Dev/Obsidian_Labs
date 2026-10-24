@@ -13,7 +13,6 @@ from fastapi import HTTPException, UploadFile, status
 from backend.app.config import settings
 from backend.app.database import get_db
 from backend.app.models import ReceiptUpdatePayload, VoiceQuickEntryPayload
-from backend.app.storage import delete_object, download_object, upload_object
 
 logger = logging.getLogger("shopledger.receipts")
 
@@ -124,15 +123,11 @@ async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
 
     # Generate unique receipt ID
     receipt_id = f"rec_{uuid.uuid4().hex[:12]}"
-
     stored_filename = f"{receipt_id}_{safe_name}"
-    if settings.uses_supabase_storage:
-        stored_path = f"{owner_id}/{stored_filename}"
-        upload_object(stored_path, content, content_type)
-    else:
-        target_path = settings.upload_dir_resolved / stored_filename
-        target_path.write_bytes(content)
-        stored_path = str(target_path)
+    target_path = settings.upload_dir_resolved / stored_filename
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_bytes(content)
+    stored_path = str(target_path)
 
     # Check for exact duplicate by SHA-256 hash
     duplicate_of_id = None
@@ -197,7 +192,7 @@ async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
     return receipt_id
 
 
-def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path | bytes, str, str]:
+def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path, str, str]:
     """Retrieve file path, mime type, and filename for an existing receipt."""
     with get_db() as conn:
         row = conn.execute(
@@ -211,9 +206,6 @@ def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path | bytes, 
                 detail=f"Receipt with ID '{receipt_id}' not found.",
             )
 
-        if settings.uses_supabase_storage:
-            file_content = download_object(row["file_path"])
-            return file_content, row["mime_type"], row["file_name"]
         file_path = Path(row["file_path"])
         if not file_path.is_file():
             raise HTTPException(
@@ -237,23 +229,15 @@ def delete_receipt(receipt_id: str, owner_id: int = 1) -> None:
                 detail=f"Receipt with ID '{receipt_id}' not found.",
             )
 
-        if settings.uses_supabase_storage:
-            stored_path = row["file_path"]
-        else:
-            file_path = Path(row["file_path"])
-            upload_dir = settings.upload_dir_resolved.resolve()
-            if file_path.resolve().parent != upload_dir:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Receipt file is outside the configured uploads directory.",
-                )
-            stored_path = None
+        file_path = Path(row["file_path"])
+        upload_dir = settings.upload_dir_resolved.resolve()
+        if file_path.resolve().parent != upload_dir:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Receipt file is outside the configured uploads directory.",
+            )
 
         conn.execute("DELETE FROM receipts WHERE id = ? AND owner_id = ?;", (receipt_id, owner_id))
-
-    if stored_path is not None:
-        delete_object(stored_path)
-        return
 
     try:
         file_path.unlink(missing_ok=True)
@@ -362,7 +346,7 @@ async def perform_receipt_extraction(
     owner_id: int = 1,
 ) -> dict:
     """Run structured Gemini extraction on receipt file, check duplicates, save to DB, and return Receipt shape."""
-    file_content, mime_type, file_name = get_receipt_file(receipt_id, owner_id)
+    file_path, mime_type, file_name = get_receipt_file(receipt_id, owner_id)
 
     # Mark as extracting
     with get_db() as conn:
@@ -372,7 +356,7 @@ async def perform_receipt_extraction(
         )
 
     try:
-        extraction, raw_json = extract_receipt_with_gemini(file_content, mime_type, file_name)
+        extraction, raw_json = extract_receipt_with_gemini(file_path, mime_type, file_name)
     except Exception as e:
         with get_db() as conn:
             conn.execute(
@@ -976,13 +960,10 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
   <text x="30" y="340" font-size="32" font-family="sans-serif" font-weight="extrabold" fill="#B45309">- INR {payload.amount:.2f}</text>
 </svg>"""
 
-    if settings.uses_supabase_storage:
-        stored_path = f"{owner_id}/{voucher_filename}"
-        upload_object(stored_path, svg_content.encode("utf-8"), "image/svg+xml")
-    else:
-        voucher_path = settings.upload_dir_resolved / voucher_filename
-        voucher_path.write_text(svg_content, encoding="utf-8")
-        stored_path = str(voucher_path)
+    voucher_path = settings.upload_dir_resolved / voucher_filename
+    voucher_path.parent.mkdir(parents=True, exist_ok=True)
+    voucher_path.write_text(svg_content, encoding="utf-8")
+    stored_path = str(voucher_path)
     file_hash = hashlib.sha256(svg_content.encode("utf-8")).hexdigest()
 
     with get_db() as conn:

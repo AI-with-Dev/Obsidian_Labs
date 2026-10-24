@@ -99,7 +99,7 @@ def get_gemini_client() -> genai.Client:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                "Gemini is not configured. Set GEMINI_API_KEY in the backend service's "
+                "Gemini is not configured. Set GEMINI_API_KEY in the backend "
                 "environment variables and redeploy."
             ),
         )
@@ -130,21 +130,18 @@ def normalize_category(cat: Optional[str]) -> str:
 
 
 def extract_receipt_with_gemini(
-    file_path: Path | bytes,
+    file_path: Path,
     mime_type: str,
     file_name: str = "receipt",
 ) -> Tuple[ReceiptExtractionResult, str]:
     """Invoke Gemini API to extract structured fields from a stored receipt."""
-    if isinstance(file_path, bytes):
-        file_bytes = file_path
-    else:
-        if not file_path.is_file():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Receipt file not found on disk.",
-            )
-        file_bytes = file_path.read_bytes()
-        file_name = file_path.name
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Receipt file not found on disk.",
+        )
+    file_bytes = file_path.read_bytes()
+    file_name = file_path.name
     client = get_gemini_client()
 
     file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)

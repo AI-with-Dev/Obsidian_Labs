@@ -23,14 +23,14 @@ from backend.app.services.gemini_service import (
 )
 
 
-def test_gemini_client_reports_missing_render_environment_key(monkeypatch):
+def test_gemini_client_reports_missing_environment_key(monkeypatch):
     monkeypatch.setattr(settings, "GEMINI_API_KEY", " \n ")
 
     with pytest.raises(HTTPException) as exc_info:
         get_gemini_client()
 
     assert "GEMINI_API_KEY" in exc_info.value.detail
-    assert "backend service's environment variables" in exc_info.value.detail
+    assert "backend environment variables" in exc_info.value.detail
 
 
 def test_gemini_client_trims_environment_key(monkeypatch):
