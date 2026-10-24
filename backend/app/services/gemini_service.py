@@ -125,15 +125,22 @@ def normalize_category(cat: Optional[str]) -> str:
     return "other"
 
 
-def extract_receipt_with_gemini(file_path: Path, mime_type: str) -> Tuple[ReceiptExtractionResult, str]:
-    """Invoke Gemini API to extract structured fields from stored receipt file."""
-    if not file_path.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Receipt file not found on disk.",
-        )
-
-    file_bytes = file_path.read_bytes()
+def extract_receipt_with_gemini(
+    file_path: Path | bytes,
+    mime_type: str,
+    file_name: str = "receipt",
+) -> Tuple[ReceiptExtractionResult, str]:
+    """Invoke Gemini API to extract structured fields from a stored receipt."""
+    if isinstance(file_path, bytes):
+        file_bytes = file_path
+    else:
+        if not file_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Receipt file not found on disk.",
+            )
+        file_bytes = file_path.read_bytes()
+        file_name = file_path.name
     client = get_gemini_client()
 
     file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
@@ -156,7 +163,7 @@ def extract_receipt_with_gemini(file_path: Path, mime_type: str) -> Tuple[Receip
     for attempt in range(max_retries):
         model_name = models_to_try[attempt % len(models_to_try)]
         try:
-            logger.info("Calling Gemini extraction (attempt %d/%d, model %s) on %s", attempt + 1, max_retries, model_name, file_path.name)
+            logger.info("Calling Gemini extraction (attempt %d/%d, model %s) on %s", attempt + 1, max_retries, model_name, file_name)
             response = client.models.generate_content(
                 model=model_name,
                 contents=[

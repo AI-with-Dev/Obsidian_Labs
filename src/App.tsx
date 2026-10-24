@@ -1085,7 +1085,7 @@ function VoiceAssistantModal({
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             {/* Language Toggle Pill */}
             <div className="flex items-center bg-emerald-900/90 p-0.5 rounded-lg border border-emerald-700/60 text-xs">

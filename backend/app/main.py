@@ -16,6 +16,7 @@ from backend.app.config import settings
 from backend.app.database import get_db, init_db
 from backend.app.models import ApiResponse
 from backend.app.routers.auth import require_authenticated_owner, router as auth_router
+from backend.app.storage import ensure_storage_bucket, validate_storage_configuration
 
 # Configure server-side logging
 logging.basicConfig(
@@ -29,8 +30,12 @@ logger = logging.getLogger("shopledger.backend")
 async def lifespan(app: FastAPI):
     """Lifecycle event handler for FastAPI."""
     logger.info("Initializing Vyapar Mitra database and storage...")
+    validate_storage_configuration()
+    if settings.uses_supabase_storage:
+        ensure_storage_bucket()
     init_db()
-    settings.upload_dir_resolved.mkdir(parents=True, exist_ok=True)
+    if not settings.uses_supabase_storage:
+        settings.upload_dir_resolved.mkdir(parents=True, exist_ok=True)
     logger.info("Backend initialization complete.")
     yield
     logger.info("Vyapar Mitra backend shutting down.")

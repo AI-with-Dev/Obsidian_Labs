@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.database import init_db
+from conftest import ensure_test_owner
 
 
 from conftest import ensure_test_owner
@@ -59,7 +60,13 @@ def test_voice_quick_entry_success_under_1000():
 
     # Verify dashboard reflects confirmed receipt under totalReceived
     summary = client.get("/api/dashboard/summary").json()["data"]
+<<<<<<< HEAD
     assert summary["totalReceived"] == 60.0
+=======
+    assert summary["totalSpent"] == 0.0
+    assert summary["totalReceived"] == 60.0
+    assert summary["totalBalance"] == 60.0
+>>>>>>> refs/remotes/origin/main
     assert summary["confirmedCount"] == 1
     assert summary["reviewCount"] == 0
 
@@ -131,6 +138,24 @@ def test_voice_entry_calculation_breakdown():
     assert data["data"] == "2x40 + 10 = ₹90.00"
 
 
+def test_voice_voucher_escapes_user_content_as_xml():
+    res = client.post(
+        "/api/receipts/voice-quick-entry",
+        json={
+            "spoken_text": "<script>alert(1)</script>",
+            "amount": 25.0,
+            "vendor": "<img src=x>",
+        },
+    )
+    assert res.status_code == 200
+
+    voucher = client.get(f"/api/receipts/{res.json()['data']['id']}/file")
+    assert voucher.status_code == 200
+    assert "<script>" not in voucher.text
+    assert "&lt;script&gt;" in voucher.text
+    assert "&lt;img src=x&gt;" in voucher.text
+
+
 def test_voice_entry_high_concurrency_load():
     """Verify backend handles rapid concurrent voice requests without lock timeouts or deadlocks."""
     import concurrent.futures
@@ -160,4 +185,3 @@ def test_voice_entry_high_concurrency_load():
     confirmed = client.get("/api/receipts?status=confirmed").json()["data"]
     stress_entries = [r for r in confirmed if "Stress test item" in (r.get("data") or "")]
     assert len(stress_entries) == 40
-

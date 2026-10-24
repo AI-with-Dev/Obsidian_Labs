@@ -1,4 +1,5 @@
 import hashlib
+from html import escape
 import json
 import logging
 import re
@@ -12,6 +13,7 @@ from fastapi import HTTPException, UploadFile, status
 from backend.app.config import settings
 from backend.app.database import get_db
 from backend.app.models import ReceiptUpdatePayload, VoiceQuickEntryPayload
+from backend.app.storage import delete_object, download_object, upload_object
 
 logger = logging.getLogger("shopledger.receipts")
 
@@ -123,10 +125,14 @@ async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
     # Generate unique receipt ID
     receipt_id = f"rec_{uuid.uuid4().hex[:12]}"
 
-    # Save to disk
     stored_filename = f"{receipt_id}_{safe_name}"
-    target_path = settings.upload_dir_resolved / stored_filename
-    target_path.write_bytes(content)
+    if settings.uses_supabase_storage:
+        stored_path = f"{owner_id}/{stored_filename}"
+        upload_object(stored_path, content, content_type)
+    else:
+        target_path = settings.upload_dir_resolved / stored_filename
+        target_path.write_bytes(content)
+        stored_path = str(target_path)
 
     # Check for exact duplicate by SHA-256 hash
     duplicate_of_id = None
@@ -159,7 +165,7 @@ async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
             (
                 receipt_id,
                 owner_id,
-                str(target_path),
+                stored_path,
                 safe_name,
                 file_hash,
                 content_type,
@@ -191,7 +197,7 @@ async def process_and_save_upload(file: UploadFile, owner_id: int = 1) -> str:
     return receipt_id
 
 
-def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path, str, str]:
+def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path | bytes, str, str]:
     """Retrieve file path, mime type, and filename for an existing receipt."""
     with get_db() as conn:
         row = conn.execute(
@@ -205,13 +211,15 @@ def get_receipt_file(receipt_id: str, owner_id: int = 1) -> Tuple[Path, str, str
                 detail=f"Receipt with ID '{receipt_id}' not found.",
             )
 
+        if settings.uses_supabase_storage:
+            file_content = download_object(row["file_path"])
+            return file_content, row["mime_type"], row["file_name"]
         file_path = Path(row["file_path"])
         if not file_path.is_file():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Receipt file not found on disk.",
             )
-
         return file_path, row["mime_type"], row["file_name"]
 
 
@@ -229,15 +237,23 @@ def delete_receipt(receipt_id: str, owner_id: int = 1) -> None:
                 detail=f"Receipt with ID '{receipt_id}' not found.",
             )
 
-        file_path = Path(row["file_path"])
-        upload_dir = settings.upload_dir_resolved.resolve()
-        if file_path.resolve().parent != upload_dir:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Receipt file is outside the configured uploads directory.",
-            )
+        if settings.uses_supabase_storage:
+            stored_path = row["file_path"]
+        else:
+            file_path = Path(row["file_path"])
+            upload_dir = settings.upload_dir_resolved.resolve()
+            if file_path.resolve().parent != upload_dir:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Receipt file is outside the configured uploads directory.",
+                )
+            stored_path = None
 
         conn.execute("DELETE FROM receipts WHERE id = ? AND owner_id = ?;", (receipt_id, owner_id))
+
+    if stored_path is not None:
+        delete_object(stored_path)
+        return
 
     try:
         file_path.unlink(missing_ok=True)
@@ -346,7 +362,7 @@ async def perform_receipt_extraction(
     owner_id: int = 1,
 ) -> dict:
     """Run structured Gemini extraction on receipt file, check duplicates, save to DB, and return Receipt shape."""
-    file_path, mime_type, _ = get_receipt_file(receipt_id, owner_id)
+    file_content, mime_type, file_name = get_receipt_file(receipt_id, owner_id)
 
     # Mark as extracting
     with get_db() as conn:
@@ -356,7 +372,7 @@ async def perform_receipt_extraction(
         )
 
     try:
-        extraction, raw_json = extract_receipt_with_gemini(file_path, mime_type)
+        extraction, raw_json = extract_receipt_with_gemini(file_content, mime_type, file_name)
     except Exception as e:
         with get_db() as conn:
             conn.execute(
@@ -926,24 +942,32 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
     today_str = datetime.now().strftime("%Y-%m-%d")
     now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Generate an SVG voucher file for disk retrieval
+    safe_vendor_name = escape(vendor_name, quote=False)
+    safe_spoken_text = escape(payload.spoken_text[:40], quote=False)
+
+    # Generate an SVG voucher file for receipt retrieval.
     voucher_filename = f"{receipt_id}_voice_voucher.svg"
+<<<<<<< HEAD
     voucher_path = settings.upload_dir_resolved / voucher_filename
 
     if is_income:
         svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+=======
+    svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+>>>>>>> refs/remotes/origin/main
   <rect width="400" height="400" fill="#FFFDF8" stroke="#059669" stroke-width="3" rx="12"/>
   <rect x="0" y="0" width="400" height="60" fill="#064E3B"/>
   <text x="200" y="38" font-size="18" font-family="sans-serif" font-weight="bold" fill="#ECFDF5" text-anchor="middle">VOICE MONEY ADDED VOUCHER</text>
   <text x="30" y="110" font-size="16" font-family="sans-serif" fill="#6B7280">Payer / Source:</text>
-  <text x="30" y="135" font-size="20" font-family="sans-serif" font-weight="bold" fill="#111827">{vendor_name}</text>
+  <text x="30" y="135" font-size="20" font-family="sans-serif" font-weight="bold" fill="#111827">{safe_vendor_name}</text>
   <text x="30" y="180" font-size="16" font-family="sans-serif" fill="#6B7280">Date: {today_str}</text>
   <text x="30" y="210" font-size="16" font-family="sans-serif" fill="#6B7280">Voice Audio Data:</text>
-  <text x="30" y="235" font-size="14" font-family="sans-serif" fill="#064E3B" font-style="italic">{payload.spoken_text[:40]}</text>
+  <text x="30" y="235" font-size="14" font-family="sans-serif" fill="#064E3B" font-style="italic">{safe_spoken_text}</text>
   <line x1="30" y1="260" x2="370" y2="260" stroke="#E5E7EB" stroke-width="2"/>
   <text x="30" y="300" font-size="16" font-family="sans-serif" fill="#6B7280">Total Added (जमा):</text>
   <text x="30" y="340" font-size="32" font-family="sans-serif" font-weight="extrabold" fill="#059669">+ INR {payload.amount:.2f}</text>
 </svg>"""
+<<<<<<< HEAD
     else:
         svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
   <rect width="400" height="400" fill="#FFFDF8" stroke="#D97706" stroke-width="3" rx="12"/>
@@ -960,6 +984,15 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
 </svg>"""
 
     voucher_path.write_text(svg_content, encoding="utf-8")
+=======
+    if settings.uses_supabase_storage:
+        stored_path = f"{owner_id}/{voucher_filename}"
+        upload_object(stored_path, svg_content.encode("utf-8"), "image/svg+xml")
+    else:
+        voucher_path = settings.upload_dir_resolved / voucher_filename
+        voucher_path.write_text(svg_content, encoding="utf-8")
+        stored_path = str(voucher_path)
+>>>>>>> refs/remotes/origin/main
     file_hash = hashlib.sha256(svg_content.encode("utf-8")).hexdigest()
 
     with get_db() as conn:
@@ -974,7 +1007,7 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
             (
                 receipt_id,
                 owner_id,
-                str(voucher_path),
+                stored_path,
                 voucher_filename,
                 file_hash,
                 "image/svg+xml",

@@ -9,6 +9,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
+import psycopg
+
 from backend.app.database import get_db
 from backend.app.models import ApiResponse
 
@@ -221,8 +223,8 @@ async def setup_account(payload: AccountInput, request: Request, response: Respo
                     payload.currency,
                 ),
             )
-            owner_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-    except sqlite3.IntegrityError as exc:
+            owner_id = conn.execute("SELECT id FROM shop_owner WHERE email = ?", (payload.email.strip().lower(),)).fetchone()["id"]
+    except (sqlite3.IntegrityError, psycopg.IntegrityError) as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email address already exists.",
@@ -238,7 +240,7 @@ async def setup_account(payload: AccountInput, request: Request, response: Respo
 async def login(payload: LoginInput, request: Request, response: Response):
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id, password_hash FROM shop_owner WHERE email = ? COLLATE NOCASE",
+            "SELECT id, password_hash FROM shop_owner WHERE LOWER(email) = LOWER(?)",
             (payload.email.strip(),),
         ).fetchone()
     if row is None or not _verify_password(payload.password, row["password_hash"]):
@@ -323,7 +325,7 @@ async def update_profile(payload: AccountUpdate, owner: dict = Depends(require_a
                 "SELECT * FROM shop_owner WHERE id = ?",
                 (owner["id"],),
             ).fetchone()
-    except sqlite3.IntegrityError as exc:
+    except (sqlite3.IntegrityError, psycopg.IntegrityError) as exc:
         raise HTTPException(status_code=409, detail="That email address is already in use.") from exc
     return ApiResponse.ok(_account_payload(row))
 

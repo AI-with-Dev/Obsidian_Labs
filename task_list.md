@@ -242,5 +242,4 @@ This task list tracks the execution of each authorized step for **ShopLedger**. 
   - Prominent bold green added money display (`+ ₹{amount}`) with breakdown indicator.
   - Editable payer/source and amount inputs.
 - [x] Synchronize bilingual localization in `src/locales/en.json` and `src/locales/hi.json`.
-- [x] Verified full compilation (`npx tsc --noEmit && npm run build`) and backend tests (48/48 passed).
-
+- [x] Verified frontend build and backend tests (68 passed).
