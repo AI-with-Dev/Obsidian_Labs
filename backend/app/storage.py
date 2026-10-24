@@ -33,7 +33,10 @@ def _headers(content_type: str | None = None) -> dict[str, str]:
 
 
 def _url(path: str) -> str:
-    return f"{settings.SUPABASE_URL.rstrip('/')}/storage/v1/{path}"
+    project_url = settings.SUPABASE_URL.rstrip("/")
+    if project_url.endswith("/rest/v1"):
+        project_url = project_url.removesuffix("/rest/v1")
+    return f"{project_url}/storage/v1/{path}"
 
 
 def _request(method: str, path: str, **kwargs) -> httpx.Response:

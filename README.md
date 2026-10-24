@@ -119,7 +119,7 @@ Render Free's filesystem is ephemeral, so configure Supabase as the app's extern
 3. In **Project Settings → API**, copy the project URL and the server-side `service_role` key. Never use the service-role key in frontend variables or commit it to source control.
 4. In Render, open the backend Web Service's **Environment** page and add:
    - `DATABASE_URL`: the Supabase PostgreSQL connection URI
-   - `SUPABASE_URL`: the Supabase project URL
+   - `SUPABASE_URL`: the Supabase project URL only, e.g. `https://<project-ref>.supabase.co` (do not append `/rest/v1`)
    - `SUPABASE_SERVICE_ROLE_KEY`: the server-side service-role key
    - `SUPABASE_STORAGE_BUCKET`: `receipt-files` (optional; this is the default)
 5. Save and redeploy the backend. On startup it creates/verifies a private `receipt-files` bucket. The frontend's existing `VITE_API_BASE_URL` and backend `CORS_ORIGINS` settings remain unchanged.

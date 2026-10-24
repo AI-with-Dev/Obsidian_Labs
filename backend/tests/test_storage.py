@@ -4,12 +4,25 @@ import pytest
 from backend.app.config import settings
 from backend.app.database import PostgresConnection
 from backend.app.storage import (
+    _url,
     delete_object,
     download_object,
     ensure_storage_bucket,
     upload_object,
     validate_storage_configuration,
 )
+
+
+def test_storage_url_handles_supabase_rest_api_url(monkeypatch):
+    monkeypatch.setattr(
+        settings,
+        "SUPABASE_URL",
+        "https://project.supabase.co/rest/v1/",
+    )
+
+    assert _url("bucket/receipt-files") == (
+        "https://project.supabase.co/storage/v1/bucket/receipt-files"
+    )
 
 
 def test_postgres_placeholder_conversion_preserves_quoted_question_marks():
