@@ -96,7 +96,7 @@ def classify_question_intent(question: str) -> Tuple[str, Dict]:
     if settings.GEMINI_API_KEY:
         try:
             client = genai.Client(api_key=settings.GEMINI_API_KEY)
-            prompt = f"""You are a question intent classifier for ShopLedger, an expense tracking system for a small shop.
+            prompt = f"""You are a question intent classifier for Vyapar Mitra, an expense tracking system for a small shop.
 Classify the following user query into exactly ONE of the allowed intents:
 - TOTAL_SPEND: queries asking about overall confirmed spending or receipt count
 - CATEGORY_SPEND: queries asking about spending on a specific category (inventory, packaging, transport, utilities, rent, repairs, other)

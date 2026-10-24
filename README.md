@@ -1,4 +1,4 @@
-# ShopLedger (दुकान का खाता)
+# Vyapar Mitra (व्यापार मित्र — डिजिटल बहीखाता)
 
 A reliable, small-business expense management and receipt auditing web application built for an Indian stationery shop owner.
 

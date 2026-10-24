@@ -3,6 +3,7 @@ import {useI18n,money,day} from './i18n'
 import * as api from './api'
 import {Account} from './api'
 import {AuthPage,SettingsPage} from './account'
+import {VyaparMitraLogo} from './components/VyaparMitraLogo'
 import {CATEGORIES,Receipt,Item,Filters,Answer} from './types'
 
 // Reusable SVG Icons for clear, simple visual guidance
@@ -515,7 +516,7 @@ function ReviewReceiptModal({ receiptId, file, onClose, onSuccess, onDeleted }: 
                 {t('rv.title')}
               </h2>
               <p className="text-xs text-stone-500">
-                {receipt?.fileName || file?.name || 'ShopLedger'}
+                {receipt?.fileName || file?.name || 'Vyapar Mitra'}
               </p>
             </div>
           </div>
@@ -1437,8 +1438,10 @@ export default function App(){
       setAccount(null)
       setAuthError('')
     }
-    window.addEventListener('shopledger:unauthorized',expired)
-    return ()=>window.removeEventListener('shopledger:unauthorized',expired)
+    window.addEventListener('vyapar-mitra:unauthorized',expired)
+    return ()=>{
+      window.removeEventListener('vyapar-mitra:unauthorized',expired)
+    }
   },[])
   const h = useHash()
   const [path, query = ''] = h.split('?')
@@ -1449,8 +1452,44 @@ export default function App(){
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Header Dropdown Menu state
+  // Header state & click-outside detection
   const [menuOpen, setMenuOpen] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
+
+  // Close mobile dropdown menu on click outside or Escape key
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [menuOpen])
+
+  // Automatically close mobile menu when expanding to tablet/desktop (>= 640px)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 640) {
+        setMenuOpen(false)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Direct route detection for #/receipt/:id
   useEffect(() => {
@@ -1529,6 +1568,20 @@ export default function App(){
     }
   }
 
+  const handleExportPdf = async () => {
+    try {
+      setExportingPdf(true)
+      await api.exportPdf()
+      setToastMessage(t('settings.exported'))
+      setTimeout(() => setToastMessage(null), 4000)
+    } catch {
+      setToastMessage(t('settings.exportError'))
+      setTimeout(() => setToastMessage(null), 4000)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
   const nav = [
     { p: '/', k: 'nav.home', icon: StoreIcon },
     { p: '/upload', k: 'nav.upload', icon: PlusIcon },
@@ -1589,46 +1642,129 @@ export default function App(){
         />
       )}
 
-      {/* Top Header Bar - Only Logo is visible, with a dropdown menu trigger */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-2xs">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:py-3.5">
-          {/* Only Logo visible on the header */}
-          <a href="#/" className="flex items-center gap-2.5 text-emerald-900 group">
-            <span className="w-10 h-10 rounded-xs bg-emerald-700 text-white flex items-center justify-center shadow-xs group-hover:bg-emerald-800 transition-colors">
-              <StoreIcon className="w-5 h-5" />
-            </span>
-            <div className="leading-tight">
-              <span className="text-xl sm:text-2xl font-extrabold tracking-tight block text-emerald-950">
-                {t('app.name')}
-              </span>
-              <span className="text-[11px] font-medium text-stone-500 uppercase tracking-wider hidden sm:block">
-                Digital Shopkeeper Ledger
+      {/* Top Header Bar - Responsive Adaptive Mobile & Desktop Navigation */}
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-[0_1px_4px_rgba(0,0,0,0.03)] transition-all"
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4 py-2.5">
+          {/* Brand Logo & Typography Lockup */}
+          <a
+            href="#/"
+            onClick={() => setMenuOpen(false)}
+            className="flex items-center gap-2.5 sm:gap-3 group select-none transition-transform active:scale-[0.99] shrink-0"
+            aria-label="Vyapar Mitra Home"
+          >
+            {/* Sleek Geometric Logo Icon */}
+            <div className="relative shrink-0 flex items-center justify-center">
+              <VyaparMitraLogo className="w-9 h-9 sm:w-10 sm:h-10 drop-shadow-sm group-hover:scale-105 group-hover:drop-shadow transition-all duration-200" />
+              <span
+                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white ring-1 ring-emerald-600/20"
+                title="Synced & Active"
+              />
+            </div>
+
+            {/* Refined Brand Typography & SaaS Accent */}
+            <div className="leading-tight flex flex-col justify-center">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="text-lg sm:text-[21px] font-black tracking-tight text-stone-900 group-hover:text-emerald-950 transition-colors">
+                  {lang === 'hi' ? 'व्यापार' : 'Vyapar'}
+                </span>
+                <span className="text-lg sm:text-[21px] font-black tracking-tight bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent">
+                  {lang === 'hi' ? 'मित्र' : 'Mitra'}
+                </span>
+                <span className="hidden xl:inline-flex items-center px-1.5 py-0.5 rounded-xs text-[10px] font-extrabold uppercase tracking-wide bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-2xs">
+                  {lang === 'hi' ? 'डिजिटल बहीखाता' : 'Smart Ledger'}
+                </span>
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-stone-500 tracking-normal hidden md:block">
+                {lang === 'hi' ? 'दुकानदार का भरोसेमंद साथी' : 'Digital Retail Ledger & Business Companion'}
               </span>
             </div>
           </a>
 
-          {/* Header Dropdown Toggle Trigger Button */}
-          <button
-            type="button"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-expanded={menuOpen}
-            aria-label={t('nav.label')}
-            className="flex items-center gap-2 px-3 py-2 rounded-xs border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 font-semibold text-sm shadow-2xs cursor-pointer transition-colors"
-          >
-            {menuOpen ? (
-              <XIcon className="w-5 h-5 text-stone-700" />
-            ) : (
-              <MenuIcon className="w-5 h-5 text-stone-700" />
-            )}
-            <ChevronDownIcon className={`w-4 h-4 text-stone-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
-          </button>
+          {/* Laptop & Desktop Layout (640px and wider): Full horizontal inline navigation */}
+          <nav aria-label={t('nav.label')} className="hidden sm:flex items-center gap-1 md:gap-1.5 lg:gap-2">
+            {nav.map(item => {
+              const active = path === item.p
+              const Icon = item.icon
+              return (
+                <a
+                  key={item.p}
+                  href={'#' + item.p}
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-xs md:text-sm font-semibold transition-all duration-150 select-none ${
+                    active
+                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs'
+                      : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 transition-colors ${active ? 'text-emerald-700' : 'text-stone-400'}`} />
+                  <span className="whitespace-nowrap">{t(item.k)}</span>
+                </a>
+              )
+            })}
+          </nav>
+
+          {/* Desktop Right Quick Actions (Export PDF & Language Switcher) */}
+          <div className="hidden sm:flex items-center gap-1.5 md:gap-2 border-l border-stone-200/80 pl-2 md:pl-3">
+            <button
+              type="button"
+              disabled={exportingPdf}
+              onClick={handleExportPdf}
+              aria-label={t('nav.exportPdf')}
+              title={t('nav.exportPdf')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs border border-stone-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/70 text-stone-700 hover:text-emerald-900 text-xs md:text-sm font-semibold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+            >
+              <DownloadIcon className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+              <span className="hidden lg:inline">{t('nav.exportPdf')}</span>
+              <span className="lg:hidden">PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void changeLanguage()}
+              aria-label={t('lang.label')}
+              title={t('lang.label')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs border border-stone-200 hover:border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-xs md:text-sm font-semibold shadow-2xs transition-all cursor-pointer"
+            >
+              <span className="text-sm leading-none">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
+              <span>{t('lang.other')}</span>
+            </button>
+          </div>
+
+          {/* Mobile Layout (< 640px / sm): Hamburger toggle button on the right */}
+          <div className="flex sm:hidden items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-expanded={menuOpen}
+              aria-label={t('nav.label')}
+              className={`flex items-center justify-center p-2 rounded-xs border font-semibold shadow-2xs cursor-pointer transition-all active:scale-95 ${
+                menuOpen
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300 ring-2 ring-emerald-500/20'
+                  : 'bg-white hover:bg-stone-50 border-stone-300 text-stone-800 hover:border-emerald-600/40'
+              }`}
+            >
+              {menuOpen ? (
+                <XIcon className="w-5 h-5 text-emerald-800" />
+              ) : (
+                <MenuIcon className="w-5 h-5 text-stone-700" />
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Dropdown Navigation & Quick Actions Menu */}
+        {/* Mobile Dropdown Menu (screens smaller than 640px) */}
         {menuOpen && (
-          <div className="border-t border-stone-200 bg-white shadow-md animate-in slide-in-from-top-1 duration-150">
-            <div className="mx-auto max-w-5xl px-4 py-3 space-y-3">
-              <nav aria-label={t('nav.label')} className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div
+            className="sm:hidden border-t border-stone-200/90 bg-white/98 backdrop-blur-md shadow-lg animate-in slide-in-from-top-2 duration-150"
+            role="dialog"
+            aria-label={t('nav.label')}
+          >
+            <div className="px-4 py-3 space-y-3">
+              {/* Navigation links list */}
+              <nav aria-label={t('nav.label')} className="flex flex-col space-y-1">
                 {nav.map(item => {
                   const active = path === item.p
                   const Icon = item.icon
@@ -1638,42 +1774,56 @@ export default function App(){
                       href={'#' + item.p}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => setMenuOpen(false)}
-                      className={`flex items-center gap-2.5 py-2.5 px-3 rounded-xs text-sm font-semibold transition-all ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xs text-sm font-semibold transition-colors active:scale-[0.99] ${
                         active
-                          ? 'bg-emerald-50 text-emerald-900 border border-emerald-300'
-                          : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100 border border-transparent'
+                          ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs'
+                          : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50 border border-transparent'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-500'}`} />
-                      <span className="truncate">{t(item.k)}</span>
+                      <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-emerald-700' : 'text-stone-400'}`} />
+                      <span className="flex-1">{t(item.k)}</span>
+                      {active && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                      )}
                     </a>
                   )
                 })}
               </nav>
 
-              <div className="pt-2 border-t border-stone-200/80 flex flex-wrap items-center justify-between gap-2">
+              {/* Action triggers: Export PDF & Language Switcher */}
+              <div className="pt-2.5 border-t border-stone-200 flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={exportingPdf}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void handleExportPdf()
+                  }}
+                  className="flex items-center justify-between w-full px-3 py-2.5 rounded-xs border border-stone-200 hover:border-emerald-300 bg-stone-50 hover:bg-emerald-50 text-stone-800 hover:text-emerald-900 text-sm font-semibold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <DownloadIcon className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>{t('nav.exportPdf')}</span>
+                  </div>
+                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">PDF</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     setMenuOpen(false)
-                    hiddenFileInputRef.current?.click()
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xs bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  <span>{t('home.add')}</span>
-                </button>
-
-                <button
-                  className="min-h-[38px] px-3.5 rounded-xs border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-2xs"
-                  aria-label={t('lang.label')}
-                  onClick={() => {
                     void changeLanguage()
-                    setMenuOpen(false)
                   }}
+                  className="flex items-center justify-between w-full px-3 py-2.5 rounded-xs border border-stone-200 hover:border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 text-sm font-semibold transition-colors shadow-2xs cursor-pointer"
+                  aria-label={t('lang.label')}
                 >
-                  <span className="text-base">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
-                  <span>{t('lang.other')}</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base leading-none">{lang === 'en' ? '🇮🇳' : '🇬🇧'}</span>
+                    <span>{t('lang.label')}: {t('lang.other')}</span>
+                  </div>
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wide">
+                    {lang === 'en' ? 'हिन्दी' : 'English'}
+                  </span>
                 </button>
               </div>
             </div>

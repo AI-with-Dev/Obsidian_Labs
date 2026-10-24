@@ -47,7 +47,7 @@ def test_export_empty_csv(client):
     response = client.get("/api/export/csv")
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]
-    assert "shopledger-expenses.csv" in response.headers["content-disposition"]
+    assert "vyapar-mitra-expenses.csv" in response.headers["content-disposition"]
     
     reader = csv.reader(io.StringIO(response.text))
     rows = list(reader)

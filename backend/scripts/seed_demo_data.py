@@ -24,7 +24,7 @@ def create_sample_svg(filename: str, vendor: str, total_str: str, date_str: str)
   <line x1="50" y1="480" x2="430" y2="480" stroke="#1c1917" stroke-width="2"/>
   <text x="50" y="520" font-family="system-ui, sans-serif" font-size="18" font-weight="bold" fill="#1c1917">TOTAL AMOUNT</text>
   <text x="430" y="520" font-family="system-ui, sans-serif" font-size="22" font-weight="bold" fill="#047857" text-anchor="end">{total_str}</text>
-  <text x="240" y="580" font-family="system-ui, sans-serif" font-size="12" fill="#a8a29e" text-anchor="middle">ShopLedger Verified Expense</text>
+  <text x="240" y="580" font-family="system-ui, sans-serif" font-size="12" fill="#a8a29e" text-anchor="middle">Vyapar Mitra Verified Expense</text>
 </svg>"""
     file_path = UPLOAD_DIR / filename
     file_path.write_text(svg_content, encoding="utf-8")
