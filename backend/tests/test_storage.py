@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from backend.app.config import settings
-from backend.app.database import PostgresConnection
+from backend.app.database import PostgresConnection, validate_database_url
 from backend.app.storage import (
     _url,
     delete_object,
@@ -54,6 +54,19 @@ def test_postgres_placeholder_conversion_preserves_quoted_question_marks():
     query = "SELECT '?' AS literal, col FROM table WHERE a = ? AND b = \"?\""
     assert PostgresConnection._postgres_placeholders(query) == (
         "SELECT '?' AS literal, col FROM table WHERE a = %s AND b = \"?\""
+    )
+
+
+def test_database_url_rejects_unescaped_at_in_password():
+    with pytest.raises(RuntimeError, match=r"URL-encode reserved characters.*%40"):
+        validate_database_url(
+            "postgresql://postgres.project:pass@word@aws-0-region.pooler.supabase.com:5432/postgres"
+        )
+
+
+def test_database_url_accepts_percent_encoded_at_in_password():
+    validate_database_url(
+        "postgresql://postgres.project:pass%40word@aws-0-region.pooler.supabase.com:5432/postgres"
     )
 
 

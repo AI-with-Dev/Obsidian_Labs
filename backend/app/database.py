@@ -1,6 +1,7 @@
 import sqlite3
 from contextlib import contextmanager
 from typing import Any, Generator
+from urllib.parse import urlsplit
 
 import psycopg
 from psycopg.rows import dict_row
@@ -183,6 +184,32 @@ POSTGRES_SCHEMA = (
     "CREATE INDEX IF NOT EXISTS idx_login_sessions_expiry ON login_sessions(expires_at)",
 )
 
+
+def validate_database_url(database_url: str) -> None:
+    """Reject common malformed Postgres URI values without exposing credentials."""
+    value = database_url.strip()
+    try:
+        parsed = urlsplit(value)
+        authority = parsed.netloc
+        invalid_url = (
+            any(char.isspace() for char in value)
+            or parsed.scheme not in {"postgres", "postgresql"}
+            or not authority
+            or not parsed.hostname
+            or authority.count("@") > 1
+            or bool(parsed.fragment)
+        )
+    except ValueError:
+        invalid_url = True
+
+    if invalid_url:
+        raise RuntimeError(
+            "DATABASE_URL is malformed. Copy the PostgreSQL URI from Supabase and "
+            "URL-encode reserved characters in the database password (for example, "
+            "replace @ with %40). Do not include surrounding whitespace."
+        )
+
+
 class PostgresConnection:
     def __init__(self, connection: psycopg.Connection):
         self._connection = connection
@@ -231,6 +258,7 @@ class PostgresConnection:
 def get_connection(db_path: str = None) -> Any:
     """Return a configured SQLite or Supabase PostgreSQL connection."""
     if db_path is None and settings.uses_supabase_database:
+        validate_database_url(settings.DATABASE_URL)
         connection = psycopg.connect(
             settings.DATABASE_URL,
             sslmode="require",
