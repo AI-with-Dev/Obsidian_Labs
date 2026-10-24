@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS receipt_events (
 CREATE INDEX IF NOT EXISTS idx_receipts_file_hash ON receipts(file_hash);
 CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(status);
 CREATE INDEX IF NOT EXISTS idx_receipts_vendor_date ON receipts(vendor, receipt_date);
-CREATE INDEX IF NOT EXISTS idx_receipts_type ON receipts(type);
 CREATE INDEX IF NOT EXISTS idx_receipts_created_at ON receipts(created_at);
 CREATE INDEX IF NOT EXISTS idx_receipts_date ON receipts(receipt_date);
 CREATE INDEX IF NOT EXISTS idx_items_receipt_id ON receipt_items(receipt_id);
@@ -198,6 +197,7 @@ def init_db(db_path: str | None = None) -> None:
             conn.execute(
                 "ALTER TABLE receipts ADD COLUMN transaction_type TEXT NOT NULL DEFAULT 'expense';"
             )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_receipts_type ON receipts(type);")
 
         item_cols = {
             row[1] for row in conn.execute("PRAGMA table_info(receipt_items);").fetchall()

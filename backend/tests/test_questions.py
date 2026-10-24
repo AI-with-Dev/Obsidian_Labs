@@ -1,8 +1,10 @@
 import io
+import json
 import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.database import init_db
+from backend.app.services import question_service
 from conftest import ensure_test_owner
 
 
@@ -163,3 +165,123 @@ def test_question_money_received_and_borrowed_items():
     assert "₹20.00" in data_bor["answer"]
     assert len(data_bor["receipts"]) == 1
     assert data_bor["receipts"][0]["vendor"] == "Ramesh"
+
+
+def test_payment_count_top_payer_and_date_query():
+    """Payment questions count and summarize confirmed income, not expense receipts."""
+    payment_data = [
+        ("Ramu Kaka Aata Becha", 100.00, "2026-10-24"),
+        ("Ramesh Kurkura Becha", 5.01, "2026-10-24"),
+        ("Earlier Customer", 50.00, "2026-10-23"),
+    ]
+    payment_ids = []
+    for index, (name, amount, receipt_date) in enumerate(payment_data):
+        receipt_id = client.post(
+            "/api/receipts/upload",
+            files={"file": (f"payment-{index}.png", io.BytesIO(b"payment"), "image/png")},
+        ).json()["data"]["id"]
+        client.patch(
+            f"/api/receipts/{receipt_id}",
+            json={"vendor": name, "date": receipt_date, "total": amount, "type": "income"},
+        )
+        client.post(f"/api/receipts/{receipt_id}/confirm")
+        payment_ids.append(receipt_id)
+
+    count_response = client.post(
+        "/api/questions/ask",
+        json={"question": "How many payment entries are recorded?", "lang": "en"},
+    )
+    assert count_response.status_code == 200
+    count_data = count_response.json()["data"]
+    assert count_data["supported"] is True
+    assert "3 confirmed payment entries" in count_data["answer"]
+    assert len(count_data["receipts"]) == 3
+
+    payer_response = client.post(
+        "/api/questions/ask",
+        json={"question": "Who paid the most, and how much?", "lang": "en"},
+    )
+    assert payer_response.status_code == 200
+    payer_data = payer_response.json()["data"]
+    assert payer_data["supported"] is True
+    assert "Ramu Kaka Aata Becha" in payer_data["answer"]
+    assert "₹100.00" in payer_data["answer"]
+    assert [receipt["id"] for receipt in payer_data["receipts"]] == [payment_ids[0]]
+
+    date_response = client.post(
+        "/api/questions/ask",
+        json={"question": "What payments were received on 2026-10-24?", "lang": "en"},
+    )
+    assert date_response.status_code == 200
+    date_data = date_response.json()["data"]
+    assert date_data["supported"] is True
+    assert "Ramu Kaka Aata Becha" in date_data["answer"]
+    assert "₹100.00" in date_data["answer"]
+    assert "Ramesh Kurkura Becha" in date_data["answer"]
+    assert "₹5.01" in date_data["answer"]
+    assert "Earlier Customer" not in date_data["answer"]
+    assert {receipt["id"] for receipt in date_data["receipts"]} == set(payment_ids[:2])
+
+
+def test_free_form_question_uses_confirmed_ledger_context(monkeypatch):
+    """Unmatched questions should be answered from ledger facts, not defaulted to a canned reply."""
+    receipt_ids = seed_test_receipts()
+    captured_prompt = {}
+
+    class FakeModels:
+        def generate_content(self, *, model, contents, config):
+            assert model == "test-model"
+            if config["response_schema"] is question_service.QuestionIntent:
+                return type("Response", (), {"text": '{"intent": "UNSUPPORTED"}'})()
+            captured_prompt["contents"] = contents
+            assert config["response_schema"] is question_service.LedgerAnswer
+            return type(
+                "Response",
+                (),
+                {
+                    "text": json.dumps(
+                        {
+                            "answer": "Royal Stationery is your highest confirmed expense vendor.",
+                            "supported": True,
+                            "receipt_ids": [receipt_ids[0], "not-a-real-receipt"],
+                        }
+                    )
+                },
+            )()
+
+    class FakeClient:
+        models = FakeModels()
+
+    monkeypatch.setattr(question_service.settings, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(question_service.settings, "GEMINI_MODEL", "test-model")
+    monkeypatch.setattr(question_service.genai, "Client", lambda **kwargs: FakeClient())
+
+    response = client.post(
+        "/api/questions/ask",
+        json={"question": "What should I notice about these purchase records?", "lang": "en"},
+    )
+    assert response.status_code == 200
+    result = response.json()["data"]
+
+    assert result["supported"] is True
+    assert result["answer"] == "Royal Stationery is your highest confirmed expense vendor."
+    assert [receipt["id"] for receipt in result["receipts"]] == [receipt_ids[0]]
+    assert "Royal Stationery" in captured_prompt["contents"]
+    assert "Draft Vendor" not in captured_prompt["contents"]
+
+
+def test_free_form_question_without_gemini_has_clear_fallback(monkeypatch):
+    """Missing AI configuration must not silently turn an arbitrary question into total spend."""
+    monkeypatch.setattr(question_service.settings, "GEMINI_API_KEY", "")
+
+    assert question_service.classify_question_intent(
+        "Which product do I buy most often?"
+    ) == ("LEDGER_QA", {})
+    result = question_service.execute_question_answer(
+        "Which product do I buy most often?",
+        owner_id=1,
+    )
+
+    assert result["supported"] is False
+    assert "Gemini to be configured" in result["answer"]
+    assert "profit" not in result["answer"].lower()

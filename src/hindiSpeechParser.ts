@@ -191,6 +191,7 @@ export const UNITS: Record<string, number> = {
 
 export function parseSingleNumberExpression(text: string): number {
   const cleaned = convertDevanagariDigits(text)
+    .replace(/\b\d{1,3}(?:,\d{2,3})+\b/g, value => value.replace(/,/g, ''))
     .replace(/₹|rs\.?|inr/gi, ' ')
     .replace(/([0-9]+(?:\.[0-9]+)?)/g, ' $1 ')
 
@@ -273,6 +274,7 @@ export function parseSpokenHindiAudio(text: string, defaultPayer?: string): Pars
   const rawSegments = converted.split(/\s*(?:aur|and|plus|और|अर|अरु|गैल|तथा|जमा|\+)\s*/i)
   let grandTotal = 0
   const itemParts: string[] = []
+  const itemNames: string[] = []
 
   for (const seg of rawSegments) {
     // Check if segment has quantity x item x rate pattern: e.g. "2 register 40 rupai"
@@ -285,6 +287,7 @@ export function parseSpokenHindiAudio(text: string, defaultPayer?: string): Pars
       const rate = Number(mMatch[3])
       const lineTotal = qty * rate
       grandTotal += lineTotal
+      itemNames.push(itemName)
       itemParts.push(`${qty}x ${itemName} (₹${rate}) = ₹${lineTotal}`)
       continue
     }
@@ -302,6 +305,11 @@ export function parseSpokenHindiAudio(text: string, defaultPayer?: string): Pars
   payer = preprocessFractions(payer)
   payer = payer.replace(/[0-9]+(?:\.[0-9]+)?/g, ' ')
   payer = payer.replace(/₹|\$|\+|\-|\*|\//g, ' ')
+  for (const itemName of itemNames) {
+    const itemPattern = new RegExp(`(?:^|\\s+)${itemName}(?=[\\s,.:;!?()]|$)`, 'gi')
+    payer = payer.replace(itemPattern, ' ')
+  }
+  payer = payer.replace(/[.,;:!?]+/g, ' ')
 
   const allWordKeys = [
     ...Object.keys(MULTIPLIERS),
@@ -315,7 +323,7 @@ export function parseSpokenHindiAudio(text: string, defaultPayer?: string): Pars
 
   // Comprehensive dialect verbs, prepositions & stop words (Hinglish, Haryanvi, Bhojpuri, Rajasthani, Hindi, English)
   const stopWords =
-    /(?:^|\s+)(?:rupees|rupaye|rupay|rupai|रुपये|रुपए|रुपया|रुपै|रूपै|रिपिए|रपिए|रुपिया|रिपिया|टका|रु|रू|rs|inr|aur|and|plus|और|अर|अरु|गैल|तथा|जमा|का|की|के|से|सूं|ने|पै|पे|माँ|म्ह|भीतर|को|ko|se|ne|par|pe|ka|ki|ke|diye|diya|de|dediye|dediya|dya|mile|mila|miley|mil|aaye|aaya|aagye|aagya|mujhe|mujhko|humko|hame|humein|maine|usne|isko|usko|apne|gave|given|paid|pay|received|got|collected|credit|debit|udhar|udhari|baki|baaki|मिला|मिले|मिल्या|मिलगे|मिलग्या|पागे|आया|आए|आये|आयगे|आग्ये|आगे|आयग्या|आग्या|आयले|देग्या|देगे|दिए|दीया|दे\s+गया|दे\s+गए|देलक|देहलक|दे\s+दिए|दे\s+दिया|देना\s+है|उधार|बाकी|क्रेडिट|डेबिट|लिख\s+ले|लिख\s+दो|लिख\s+लेई|जोड़\s+ले|जोड़\s+दो|जोड़\s+दे|जोड़\s+ले|चढ़ा\s+ले|चढ़ा\s+दे|धर\s+दे|धर\s+ले|खाता|खाते|गल्ला|गल्ले|दुकान|cash|नकद|नगद|नगदी|रोकड़|रोकड़ा|पेमेंट|payment|खर्च|खर्चा|जावक)(?=[\s,.:;!?()]|$|[^\u0900-\u097Fa-zA-Z0-9])/gi
+    /(?:^|\s+)(?:rupees|rupee|rupaye|rupay|rupai|रुपये|रुपए|रुपया|रुपै|रूपै|रिपिए|रपिए|रुपिया|रिपिया|टका|रु|रू|rs|inr|aur|and|plus|each|per|for|to|from|shop|i|we|he|she|और|अर|अरु|गैल|तथा|जमा|का|की|के|से|सूं|ने|पै|पे|माँ|म्ह|भीतर|को|ko|se|ne|par|pe|ka|ki|ke|diye|diya|de|dediye|dediya|dya|mile|mila|miley|mil|aaye|aaya|aagye|aagya|mujhe|mujhko|humko|hame|humein|maine|usne|isko|usko|apne|gave|given|paid|pay|received|got|collected|credit|debit|udhar|udhari|baki|baaki|मिला|मिले|मिलल|मिलल्|मिल्या|मिलगे|मिलग्या|पागे|आया|आए|आये|आयगे|आग्ये|आगे|आयग्या|आग्या|आयले|देग्या|देगे|दिए|दीया|दे\s+गया|दे\s+गए|देलक|देहलक|दे\s+दिए|दे\s+दिया|देना\s+है|उधार|बाकी|क्रेडिट|डेबिट|लिख\s+ले|लिख\s+दो|लिख\s+लेई|जोड़\s+ले|जोड़\s+ले|चढ़ा\s+ले|चढ़ा\s+दे|धर\s+दे|धर\s+ले|खाता|खाते|गल्ला|गल्ले|दुकान|cash|नकद|नगद|नगदी|रोकड़|रोकड़ा|पेमेंट|payment|खर्च|खर्चा|जावक)(?=[\s,.:;!?()]|$|[^\u0900-\u097Fa-zA-Z0-9])/gi
 
   payer = payer.replace(stopWords, ' ').replace(stopWords, ' ').replace(stopWords, ' ').replace(/\s+/g, ' ').trim()
 

@@ -832,6 +832,7 @@ function VoiceAssistantModal({
   const [speechLang, setSpeechLang] = useState<'hi-IN' | 'en-IN'>(lang === 'en' ? 'en-IN' : 'hi-IN')
   const [listening, setListening] = useState(false)
   const [transcript, setTranscript] = useState('')
+  const [interimTranscript, setInterimTranscript] = useState('')
   const [calculatedAmount, setCalculatedAmount] = useState<number | null>(null)
   const [breakdown, setBreakdown] = useState<string>('')
   const [vendorName, setVendorName] = useState('दुकान आवक')
@@ -842,18 +843,29 @@ function VoiceAssistantModal({
   const activeRecRef = useRef<any>(null)
   const isListeningDesiredRef = useRef(false)
   const restartTimerRef = useRef<any>(null)
-  const retryCountRef = useRef(0)
+  const transcriptRef = useRef('')
+  const sessionHasSpeechRef = useRef(false)
+  const vendorNameRef = useRef('दुकान आवक')
+
+  const updateVendorName = (name: string) => {
+    vendorNameRef.current = name
+    setVendorName(name)
+  }
 
   // Sync default vendor label when language switches
   useEffect(() => {
     if (vendorName === 'दुकान आवक' || vendorName === 'Money Added' || !vendorName) {
-      setVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
+      updateVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
     }
   }, [speechLang])
 
   const processSpokenInput = useCallback((text: string) => {
     setErrorMsg(null)
-    if (!text || !text.trim()) return
+    if (!text || !text.trim()) {
+      setCalculatedAmount(null)
+      setBreakdown('')
+      return
+    }
 
     const defaultPayer = speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added'
     const result = parseSpokenHindiAudio(text, defaultPayer)
@@ -861,16 +873,18 @@ function VoiceAssistantModal({
     if (result.type) {
       setTxType(result.type)
     }
-    if (result.total > 0) {
-      setCalculatedAmount(result.total)
-      setBreakdown(result.breakdown)
-    }
+    setCalculatedAmount(result.total > 0 ? result.total : null)
+    setBreakdown(result.breakdown)
     if (result.payer && result.payer.trim().length > 1 && result.payer !== defaultPayer) {
-      setVendorName(result.payer.trim())
-    } else if (result.type === 'expense' && (vendorName === 'दुकान आवक' || vendorName === 'Money Added' || !vendorName)) {
-      setVendorName(speechLang === 'hi-IN' ? 'विविध खर्च' : 'Shop Expense')
+      updateVendorName(result.payer.trim())
+    } else if (result.type === 'expense' && (
+      vendorNameRef.current === 'दुकान आवक'
+      || vendorNameRef.current === 'Money Added'
+      || !vendorNameRef.current
+    )) {
+      updateVendorName(speechLang === 'hi-IN' ? 'विविध खर्च' : 'Shop Expense')
     }
-  }, [speechLang, vendorName])
+  }, [speechLang])
 
   // Clean tear-down helper: clears timers and detaches all event handlers before aborting
   const stopSession = useCallback(() => {
@@ -891,7 +905,7 @@ function VoiceAssistantModal({
     }
   }, [])
 
-  // Fresh session factory: ALWAYS instantiates a brand new SpeechRecognition object to avoid Chrome freeze
+  // Create one-shot recognition sessions so finalized speech is retained across browser restarts.
   const startSession = useCallback(() => {
     stopSession()
 
@@ -904,21 +918,20 @@ function VoiceAssistantModal({
     setSpeechSupported(true)
     try {
       const rec = new SpeechRec()
-      rec.continuous = true
+      rec.continuous = false
       rec.interimResults = true
       rec.lang = speechLang
       rec.maxAlternatives = 1
 
       rec.onstart = () => {
         setListening(true)
-        setErrorMsg(null)
-        retryCountRef.current = 0
+        sessionHasSpeechRef.current = false
       }
 
       rec.onresult = (event: any) => {
         let finalTranscript = ''
         let interimTranscript = ''
-        for (let i = 0; i < event.results.length; i++) {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
           const item = event.results[i]
           if (item.isFinal) {
             finalTranscript += item[0].transcript + ' '
@@ -926,21 +939,26 @@ function VoiceAssistantModal({
             interimTranscript += item[0].transcript
           }
         }
-        const combined = (finalTranscript + interimTranscript).trim()
-        if (combined) {
+        setInterimTranscript(interimTranscript.trim())
+        if (finalTranscript.trim()) {
+          sessionHasSpeechRef.current = true
+          const combined = [transcriptRef.current, finalTranscript.trim()]
+            .filter(Boolean)
+            .join(' ')
+            .trim()
+          transcriptRef.current = combined
           setTranscript(combined)
+          setInterimTranscript('')
           processSpokenInput(combined)
         }
       }
 
       rec.onerror = (e: any) => {
-        // 'no-speech' happens on brief pause/silence; completely normal in continuous speech
-        if (e.error === 'no-speech' || e.error === 'aborted') {
-          return
-        }
+        if (e.error === 'aborted') return
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
           isListeningDesiredRef.current = false
           setListening(false)
+          setInterimTranscript('')
           setErrorMsg(
             e.error === 'not-allowed'
               ? 'माइक्रोफ़ोन अनुमति अस्वीकृत है। कृपया ब्राउज़र में माइक की अनुमति दें। (Microphone access denied)'
@@ -948,21 +966,32 @@ function VoiceAssistantModal({
           )
           return
         }
-        console.warn('Speech recognition event:', e.error)
-        retryCountRef.current += 1
+        isListeningDesiredRef.current = false
+        setListening(false)
+        setInterimTranscript('')
+        if (e.error === 'no-speech') {
+          setErrorMsg('No speech was detected. Check microphone access, move closer, and tap the microphone to try again.')
+        } else if (e.error === 'audio-capture') {
+          setErrorMsg('No microphone was found. Connect or enable a microphone, then try again.')
+        } else if (e.error === 'network') {
+          setErrorMsg('Speech recognition needs an internet connection. Check your connection and try again.')
+        } else {
+          setErrorMsg(`Speech recognition stopped (${e.error}). Tap the microphone to try again.`)
+        }
       }
 
       rec.onend = () => {
-        // Self-healing: if the user still desires to listen, recreate a fresh instance after 150ms backoff
+        setListening(false)
+        setInterimTranscript('')
         if (isListeningDesiredRef.current) {
-          if (restartTimerRef.current) clearTimeout(restartTimerRef.current)
+          if (!sessionHasSpeechRef.current) {
+            isListeningDesiredRef.current = false
+            setErrorMsg('No speech was detected. Check microphone access, move closer, and tap the microphone to try again.')
+            return
+          }
           restartTimerRef.current = setTimeout(() => {
-            if (isListeningDesiredRef.current) {
-              startSession()
-            }
-          }, 150)
-        } else {
-          setListening(false)
+            if (isListeningDesiredRef.current) startSession()
+          }, 500)
         }
       }
 
@@ -970,14 +999,9 @@ function VoiceAssistantModal({
       rec.start()
     } catch (err: any) {
       console.warn('Could not launch speech recognition:', err)
-      if (isListeningDesiredRef.current && retryCountRef.current < 4) {
-        retryCountRef.current += 1
-        restartTimerRef.current = setTimeout(() => {
-          if (isListeningDesiredRef.current) startSession()
-        }, 250)
-      } else {
-        setListening(false)
-      }
+      isListeningDesiredRef.current = false
+      setListening(false)
+      setErrorMsg(err instanceof Error ? err.message : 'Could not start speech recognition. Check microphone permissions and try again.')
     }
   }, [speechLang, stopSession, processSpokenInput])
 
@@ -988,6 +1012,8 @@ function VoiceAssistantModal({
       stopSession()
       setListening(false)
       setTranscript('')
+      transcriptRef.current = ''
+      setInterimTranscript('')
       setCalculatedAmount(null)
       setBreakdown('')
       setErrorMsg(null)
@@ -1009,7 +1035,9 @@ function VoiceAssistantModal({
       isListeningDesiredRef.current = false
       stopSession()
       setListening(false)
+      setInterimTranscript('')
     } else {
+      setErrorMsg(null)
       isListeningDesiredRef.current = true
       startSession()
     }
@@ -1024,20 +1052,28 @@ function VoiceAssistantModal({
   }
 
   const handleClearTranscript = () => {
+    transcriptRef.current = ''
     setTranscript('')
+    setInterimTranscript('')
     setCalculatedAmount(null)
     setBreakdown('')
     setTxType('income')
-    setVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
+    updateVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
   }
 
   const handleSelectSample = (sampleText: string) => {
+    transcriptRef.current = sampleText
     setTranscript(sampleText)
+    setInterimTranscript('')
     processSpokenInput(sampleText)
   }
 
   const handleSave = async () => {
     if (submitting) return
+    if (interimTranscript) {
+      setErrorMsg('Wait for speech recognition to finish the current phrase before saving.')
+      return
+    }
     if (!calculatedAmount || calculatedAmount <= 0) {
       setErrorMsg(t('voice.noAmount'))
       return
@@ -1245,7 +1281,7 @@ function VoiceAssistantModal({
                   onClick={() => {
                     setTxType('income')
                     if (vendorName === 'विविध खर्च' || vendorName === 'Shop Expense') {
-                      setVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
+                      updateVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
                     }
                   }}
                   className={`py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
@@ -1262,7 +1298,7 @@ function VoiceAssistantModal({
                   onClick={() => {
                     setTxType('expense')
                     if (vendorName === 'दुकान आवक' || vendorName === 'Money Added') {
-                      setVendorName(speechLang === 'hi-IN' ? 'विविध खर्च' : 'Shop Expense')
+                      updateVendorName(speechLang === 'hi-IN' ? 'विविध खर्च' : 'Shop Expense')
                     }
                   }}
                   className={`py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
@@ -1300,11 +1336,12 @@ function VoiceAssistantModal({
                   type="text"
                   value={transcript}
                   onChange={e => {
-                    setTranscript(e.target.value)
-                    processSpokenInput(e.target.value)
+                    transcriptRef.current = e.target.value
+                    setTranscript(transcriptRef.current)
+                    processSpokenInput(transcriptRef.current)
                   }}
                   onKeyDown={e => {
-                    if (e.key === 'Enter' && calculatedAmount && calculatedAmount > 0 && !submitting) {
+                    if (e.key === 'Enter' && calculatedAmount && calculatedAmount > 0 && !submitting && !interimTranscript) {
                       e.preventDefault()
                       handleSave()
                     }
@@ -1312,6 +1349,11 @@ function VoiceAssistantModal({
                   placeholder={speechLang === 'hi-IN' ? '"ताऊ के 500 जोड़ ले" या "रमेश को 100 उधार दिए"' : '"Tea 40 rupees" or "Paid 500 to Ramesh"'}
                   className="w-full bg-transparent border-0 p-0 text-stone-900 font-semibold text-base focus:ring-0 focus:outline-hidden placeholder:text-stone-400 placeholder:font-normal placeholder:italic"
                 />
+                {interimTranscript && (
+                  <p className="mt-1 text-xs text-stone-500" aria-live="polite">
+                    Hearing: {interimTranscript}
+                  </p>
+                )}
               </div>
 
               {/* Calculated Amount & Vendor Preview Card */}
@@ -1358,7 +1400,7 @@ function VoiceAssistantModal({
                       <input
                         type="text"
                         value={vendorName}
-                        onChange={e => setVendorName(e.target.value)}
+                        onChange={e => updateVendorName(e.target.value)}
                         className={`mt-0.5 w-full text-xs font-semibold px-2.5 py-1.5 bg-white rounded-lg border focus:outline-hidden text-stone-800 ${
                           txType === 'income' ? 'border-emerald-300 focus:border-emerald-600' : 'border-amber-300 focus:border-amber-600'
                         }`}
@@ -1377,7 +1419,7 @@ function VoiceAssistantModal({
                         value={calculatedAmount ?? ''}
                         onChange={e => setCalculatedAmount(parseFloat(e.target.value) || 0)}
                         onKeyDown={e => {
-                          if (e.key === 'Enter' && calculatedAmount && calculatedAmount > 0 && !submitting) {
+                          if (e.key === 'Enter' && calculatedAmount && calculatedAmount > 0 && !submitting && !interimTranscript) {
                             e.preventDefault()
                             handleSave()
                           }
@@ -1411,7 +1453,7 @@ function VoiceAssistantModal({
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={submitting || !calculatedAmount || calculatedAmount <= 0}
+                  disabled={submitting || Boolean(interimTranscript) || !calculatedAmount || calculatedAmount <= 0}
                   className={`flex-1 py-3 px-4 rounded-xl text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 ${
                     txType === 'income' ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-amber-700 hover:bg-amber-800'
                   }`}
