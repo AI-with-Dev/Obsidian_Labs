@@ -48,6 +48,18 @@ def classify_intent_deterministic(question: str) -> Optional[Tuple[str, Dict]]:
     """Fast deterministic intent detection for common queries and unsupported queries."""
     q = question.lower().strip()
 
+    # 0. Added & Credited / Ledger breakdown query
+    if ("add" in q or "जोड़" in q or "जमा" in q or "received" in q or "mile" in q or "मिले" in q) and (
+        "credit" in q or "उधार" in q or "borrowed" in q or "diye" in q or "दिए" in q or "expense" in q or "खर्च" in q
+    ):
+        return "LEDGER_BREAKDOWN", {}
+    if any(k in q for k in [
+        "where the amount is added", "added and credited", "added and credit",
+        "where is amount added", "where amount credited", "kahan add", "kahan credit",
+        "कहाँ जुड़ा", "कहाँ क्रेडिट", "कहाँ उधार", "balance overview", "ledger overview"
+    ]):
+        return "LEDGER_BREAKDOWN", {}
+
     # 1. Unsupported queries (profit, sales, revenue, turnover, loss, tax calculation)
     unsupported_terms = [
         "profit", "revenue", "sales", "turnover", "margin", "income", "gain",
@@ -161,19 +173,68 @@ def execute_question_answer(question: str, lang: str = "en", owner_id: int = 1) 
     answer_text = ""
 
     with get_db() as conn:
-        if intent == "TOTAL_RECEIVED":
+        if intent == "LEDGER_BREAKDOWN":
+            row_inc = conn.execute(
+                """
+                SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
+                FROM receipts
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'income';
+                """,
+                (owner_id,),
+            ).fetchone()
+            row_exp = conn.execute(
+                """
+                SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
+                FROM receipts
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense';
+                """,
+                (owner_id,),
+            ).fetchone()
+
+            tot_inc = (row_inc["total_paise"] or 0) / 100.0
+            cnt_inc = row_inc["count"] or 0
+            tot_exp = (row_exp["total_paise"] or 0) / 100.0
+            cnt_exp = row_exp["count"] or 0
+            net_bal = tot_inc - tot_exp
+
+            rows_inc = conn.execute(
+                "SELECT id FROM receipts WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'income' ORDER BY receipt_date DESC LIMIT 5;",
+                (owner_id,),
+            ).fetchall()
+            rows_exp = conn.execute(
+                "SELECT id FROM receipts WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense' ORDER BY receipt_date DESC LIMIT 5;",
+                (owner_id,),
+            ).fetchall()
+            receipt_ids = [r["id"] for r in rows_inc] + [r["id"] for r in rows_exp]
+
+            if is_hi:
+                answer_text = (
+                    f"पैसे जुड़े (जमा/आवक): कुल {format_money_rupees(tot_inc)} ({cnt_inc} प्रविष्टियाँ)। "
+                    f"बाकी उधार / क्रेडिट (जावक): कुल {format_money_rupees(tot_exp)} ({cnt_exp} प्रविष्टियाँ)। "
+                    f"शुद्ध शेष (Net Balance): {format_money_rupees(net_bal)}।"
+                )
+            else:
+                answer_text = (
+                    f"Money Added (Received): Total {format_money_rupees(tot_inc)} ({cnt_inc} entries). "
+                    f"Credited / Udhar (Borrowed): Total {format_money_rupees(tot_exp)} ({cnt_exp} entries). "
+                    f"Net Balance: {format_money_rupees(net_bal)}."
+                )
+
+        elif intent == "TOTAL_RECEIVED":
             row = conn.execute(
                 """
                 SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed' AND transaction_type = 'income';
-                """
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'income';
+                """,
+                (owner_id,),
             ).fetchone()
             tot = (row["total_paise"] or 0) / 100.0
             cnt = row["count"] or 0
 
             rows = conn.execute(
-                "SELECT id FROM receipts WHERE status = 'confirmed' AND transaction_type = 'income' ORDER BY receipt_date DESC LIMIT 10;"
+                "SELECT id FROM receipts WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'income' ORDER BY receipt_date DESC LIMIT 10;",
+                (owner_id,),
             ).fetchall()
             receipt_ids = [r["id"] for r in rows]
 
@@ -187,14 +248,16 @@ def execute_question_answer(question: str, lang: str = "en", owner_id: int = 1) 
                 """
                 SELECT COALESCE(SUM(total_paise), 0) AS total_paise, COUNT(*) AS count
                 FROM receipts
-                WHERE status = 'confirmed' AND transaction_type = 'expense';
-                """
+                WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense';
+                """,
+                (owner_id,),
             ).fetchone()
             tot = (row["total_paise"] or 0) / 100.0
             cnt = row["count"] or 0
 
             rows = conn.execute(
-                "SELECT id FROM receipts WHERE status = 'confirmed' AND transaction_type = 'expense' ORDER BY receipt_date DESC LIMIT 10;"
+                "SELECT id FROM receipts WHERE owner_id = ? AND status = 'confirmed' AND transaction_type = 'expense' ORDER BY receipt_date DESC LIMIT 10;",
+                (owner_id,),
             ).fetchall()
             receipt_ids = [r["id"] for r in rows]
 

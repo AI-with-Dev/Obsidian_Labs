@@ -5,6 +5,9 @@ from backend.app.database import init_db
 from conftest import ensure_test_owner
 
 
+from conftest import ensure_test_owner
+
+
 @pytest.fixture(autouse=True)
 def setup_db(tmp_path, monkeypatch):
     """Use an isolated database and upload directory for each test."""
@@ -22,13 +25,14 @@ client = TestClient(app)
 
 
 def test_voice_quick_entry_success_under_1000():
-    """Valid voice entry under ₹1,000 immediately confirms and sets the data column."""
+    """Valid voice entry under ₹1,000 immediately confirms and sets the data column as money added."""
     payload = {
-        "spoken_text": "Tea and biscuits 60 rupees",
+        "spoken_text": "Customer cash payment 60 rupees",
         "amount": 60.0,
-        "vendor": "Chai Corner",
-        "category": "utilities",
-        "data": "Spoken: Tea and biscuits 60 rupees (Calculated: ₹60.00)",
+        "vendor": "Ramesh",
+        "category": "retail_sales",
+        "type": "income",
+        "data": "Spoken: Customer cash payment 60 rupees (Calculated: ₹60.00)",
     }
     res = client.post("/api/receipts/voice-quick-entry", json=payload)
     assert res.status_code == 200
@@ -36,9 +40,8 @@ def test_voice_quick_entry_success_under_1000():
 
     assert data["status"] == "confirmed"
     assert data["total"] == 60.0
-    assert data["vendor"] == "Chai Corner"
-    assert data["category"] == "utilities"
-    assert data["data"] == "Spoken: Tea and biscuits 60 rupees (Calculated: ₹60.00)"
+    assert data["vendor"] == "Ramesh"
+    assert data["data"] == payload["data"]
     assert data["type"] == "income"
     assert len(data["items"]) == 1
     assert data["items"][0]["amount"] == 60.0
@@ -55,13 +58,48 @@ def test_voice_quick_entry_success_under_1000():
     assert "VOICE MONEY ADDED VOUCHER" in res_file.text
     assert "+ INR 60.00" in res_file.text
 
-    # Verify dashboard reflects confirmed receipt
+    # Verify dashboard reflects confirmed receipt under totalReceived
     summary = client.get("/api/dashboard/summary").json()["data"]
+<<<<<<< HEAD
+    assert summary["totalReceived"] == 60.0
+=======
     assert summary["totalSpent"] == 0.0
     assert summary["totalReceived"] == 60.0
     assert summary["totalBalance"] == 60.0
+>>>>>>> refs/remotes/origin/main
     assert summary["confirmedCount"] == 1
     assert summary["reviewCount"] == 0
+
+
+def test_voice_quick_entry_expense_credit_udhar():
+    """Voice entry with expense/credit type creates a credit/udhar entry with - sign voucher."""
+    payload = {
+        "spoken_text": "Ramesh ko 100 Diye",
+        "amount": 100.0,
+        "vendor": "Ramesh",
+        "category": "inventory",
+        "type": "expense",
+        "data": "Spoken: Ramesh ko 100 Diye | Type: बाकी उधार / दिए (-) | Party: Ramesh",
+    }
+    res = client.post("/api/receipts/voice-quick-entry", json=payload)
+    assert res.status_code == 200
+    data = res.json()["data"]
+
+    assert data["status"] == "confirmed"
+    assert data["total"] == 100.0
+    assert data["vendor"] == "Ramesh"
+    assert data["type"] == "expense"
+
+    # Verify SVG file voucher shows credit/udhar
+    res_file = client.get(f"/api/receipts/{data['id']}/file")
+    assert res_file.status_code == 200
+    assert "VOICE CREDIT / UDHAR VOUCHER" in res_file.text
+    assert "- INR 100.00" in res_file.text
+
+    # Verify dashboard reflects under totalBorrowed / totalSpent
+    summary = client.get("/api/dashboard/summary").json()["data"]
+    assert summary["totalBorrowed"] == 100.0
+    assert summary["confirmedCount"] == 1
 
 
 def test_voice_quick_entry_allows_large_amounts_and_rejects_zero():
