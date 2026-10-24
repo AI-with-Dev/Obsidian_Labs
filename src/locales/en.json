@@ -234,5 +234,14 @@
   "voice.sample3": "डेढ़ सौ चाय और बीस बिस्किट",
   "voice.sample4": "ढाई हजार रुपये मिले",
   "voice.dialectsBadge": "Hindi, Haryanvi & Regional Accents Supported",
-  "voice.dialectsDesc": "Understands Haryanvi ('Chyaar sai', 'Rupai aagye', 'Dedh sai chai ar bis biscuit'), Bhojpuri ('Doo sau') & colloquial retail speech."
+  "voice.dialectsDesc": "Understands Haryanvi ('Chyaar sai', 'Rupai aagye', 'Dedh sai chai ar bis biscuit'), Bhojpuri ('Doo sau') & colloquial retail speech.",
+  "voice.incomeLabel": "Money Added / Received (पैसे मिले / जमा)",
+  "voice.expenseLabel": "Credited / Udhar (बाकी उधार / पैसे दिए)",
+  "voice.payerLabelIncome": "Received From / Customer Name",
+  "voice.payerLabelExpense": "Given To / Party Name",
+  "voice.saveIncome": "Add Money (+)",
+  "voice.saveExpense": "Record Credit / Udhar (-)",
+  "lg.tabAll": "All Transactions",
+  "lg.tabIncome": "+ Money Added",
+  "lg.tabExpense": "- Credited / Udhar"
 }

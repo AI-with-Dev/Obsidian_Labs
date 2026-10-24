@@ -188,7 +188,7 @@ function RList({ rs, onSelect }: { rs: Receipt[]; onSelect?: (r: Receipt) => voi
               <div className="text-right flex items-center gap-3 ml-auto">
                 <div>
                   <b className={`block text-lg sm:text-xl font-black ${isBorrowed ? 'text-amber-800' : 'text-emerald-700'}`}>
-                    {r.total == null ? '—' : (isBorrowed ? `उधार ${money(r.total, lang, r.currency)}` : `+ ${money(r.total, lang, r.currency)}`)}
+                    {r.total == null ? '—' : (isBorrowed ? `- ${money(r.total, lang, r.currency)} (${lang === 'hi' ? 'उधार' : 'Credit'})` : `+ ${money(r.total, lang, r.currency)}`)}
                   </b>
                   <div className="mt-0.5">
                     <Badge s={r.status} />
@@ -813,6 +813,7 @@ function VoiceAssistantModal({
   const [calculatedAmount, setCalculatedAmount] = useState<number | null>(null)
   const [breakdown, setBreakdown] = useState<string>('')
   const [vendorName, setVendorName] = useState('दुकान आवक')
+  const [txType, setTxType] = useState<'income' | 'expense'>('income')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(true)
@@ -835,14 +836,19 @@ function VoiceAssistantModal({
     const defaultPayer = speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added'
     const result = parseSpokenHindiAudio(text, defaultPayer)
 
+    if (result.type) {
+      setTxType(result.type)
+    }
     if (result.total > 0) {
       setCalculatedAmount(result.total)
       setBreakdown(result.breakdown)
     }
     if (result.payer && result.payer.trim().length > 1 && result.payer !== defaultPayer) {
       setVendorName(result.payer.trim())
+    } else if (result.type === 'expense' && (vendorName === 'दुकान आवक' || vendorName === 'Money Added' || !vendorName)) {
+      setVendorName(speechLang === 'hi-IN' ? 'विविध खर्च' : 'Shop Expense')
     }
-  }, [speechLang])
+  }, [speechLang, vendorName])
 
   // Clean tear-down helper: clears timers and detaches all event handlers before aborting
   const stopSession = useCallback(() => {
@@ -999,6 +1005,8 @@ function VoiceAssistantModal({
     setTranscript('')
     setCalculatedAmount(null)
     setBreakdown('')
+    setTxType('income')
+    setVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
   }
 
   const handleSelectSample = (sampleText: string) => {
@@ -1016,18 +1024,24 @@ function VoiceAssistantModal({
     setSubmitting(true)
     setErrorMsg(null)
     try {
-      const payerFinal = vendorName.trim() || (speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
+      const fallbackPayer = txType === 'income'
+        ? (speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
+        : (speechLang === 'hi-IN' ? 'विविध खर्च' : 'Shop Expense')
+      const payerFinal = vendorName.trim() || fallbackPayer
+      const typeLabel = txType === 'income' ? 'पैसे मिले (+)' : 'बाकी उधार / दिए (-)'
       const res = await api.voiceQuickEntry({
         spoken_text: transcript || `${payerFinal} ₹${calculatedAmount}`,
         amount: calculatedAmount,
         vendor: payerFinal,
-        category: 'other',
-        data: `Spoken: ${transcript || `${payerFinal} ₹${calculatedAmount}`} | Payer: ${payerFinal} | Breakdown: ${breakdown || `₹${calculatedAmount}`} (Total: ₹${calculatedAmount.toFixed(2)})`
+        category: txType === 'income' ? 'other' : 'inventory',
+        type: txType,
+        transaction_type: txType,
+        data: `Spoken: ${transcript || `${payerFinal} ₹${calculatedAmount}`} | Type: ${typeLabel} | Party: ${payerFinal} | Breakdown: ${breakdown || `₹${calculatedAmount}`} (Total: ₹${calculatedAmount.toFixed(2)})`
       })
       onSuccess(res)
       onClose()
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to add money via audio.')
+      setErrorMsg(err?.message || 'Failed to record audio transaction.')
     } finally {
       setSubmitting(false)
     }
@@ -1036,11 +1050,12 @@ function VoiceAssistantModal({
   if (!isOpen) return null
 
   const samples = [
-    { label: 'ताऊ 500 जोड़ ले (हरियाणवी)', text: 'ताऊ के 500 रुपै जोड़ ले' },
-    { label: 'च्यार सै रुपै (हरियाणवी)', text: 'च्यार सै रुपै' },
-    { label: 'डेढ सै + 20 (देसी जोड़)', text: 'डेढ सै चाय अर बीस बिस्कुट' },
-    { label: 'चौधरी साहब 1200', text: 'चौधरी साहब के 1200 आग्ये' },
-    { label: 'दू सौ पचास (भोजपुरी)', text: 'दू सौ पचास रुपया' },
+    { label: 'ताऊ 500 जोड़ ले (जमा)', text: 'ताऊ के 500 रुपै जोड़ ले' },
+    { label: 'रमेश 100 उधार दिए', text: 'Ramesh ko 100 Diye' },
+    { label: 'च्यार सै रुपै (नकद आवक)', text: 'च्यार सै रुपै' },
+    { label: 'डेढ सै चाय अर बीस बिस्कुट', text: 'डेढ सै चाय अर बीस बिस्कुट' },
+    { label: 'चौधरी साहब 1200 आग्ये', text: 'चौधरी साहब के 1200 आग्ये' },
+    { label: 'दू सौ पचास मिलल (जमा)', text: 'दू सौ पचास रुपया मिलल' },
     { label: 'मास्टर जी 750 नकद', text: 'मास्टर जी 750 नकद' },
   ]
 
@@ -1201,11 +1216,49 @@ function VoiceAssistantModal({
                 </div>
               </div>
 
+              {/* Transaction Type Explicit Switcher Pill */}
+              <div className="grid grid-cols-2 gap-2 p-1.5 bg-stone-100 rounded-2xl border border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTxType('income')
+                    if (vendorName === 'विविध खर्च' || vendorName === 'Shop Expense') {
+                      setVendorName(speechLang === 'hi-IN' ? 'दुकान आवक' : 'Money Added')
+                    }
+                  }}
+                  className={`py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    txType === 'income'
+                      ? 'bg-emerald-700 text-white shadow-sm ring-2 ring-emerald-600/30'
+                      : 'text-stone-600 hover:text-emerald-800 hover:bg-stone-200/70'
+                  }`}
+                >
+                  <WalletIcon className="w-4 h-4 shrink-0" />
+                  <span>{t('voice.incomeLabel')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTxType('expense')
+                    if (vendorName === 'दुकान आवक' || vendorName === 'Money Added') {
+                      setVendorName(speechLang === 'hi-IN' ? 'विविध खर्च' : 'Shop Expense')
+                    }
+                  }}
+                  className={`py-2 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    txType === 'expense'
+                      ? 'bg-amber-700 text-white shadow-sm ring-2 ring-amber-600/30'
+                      : 'text-stone-600 hover:text-amber-800 hover:bg-stone-200/70'
+                  }`}
+                >
+                  <ClockIcon className="w-4 h-4 shrink-0" />
+                  <span>{t('voice.expenseLabel')}</span>
+                </button>
+              </div>
+
               {/* Spoken Transcript Box (with manual edit & clear capability) */}
               <div className="rounded-2xl bg-stone-50 border border-stone-200/90 p-3.5 text-left">
                 <div className="flex items-center justify-between text-xs text-stone-500 font-semibold mb-1">
                   <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${txType === 'income' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                     <span>{t('voice.dataTag')}</span>
                   </span>
                   <div className="flex items-center gap-2">
@@ -1234,48 +1287,66 @@ function VoiceAssistantModal({
                       handleSave()
                     }
                   }}
-                  placeholder={speechLang === 'hi-IN' ? '"ताऊ के 500 जोड़ ले" या "च्यार सै रुपै" या "डेढ सै चाय अर बीस बिस्कुट"' : '"Tea 40 rupees" or "50 notebooks + 20 pens"'}
+                  placeholder={speechLang === 'hi-IN' ? '"ताऊ के 500 जोड़ ले" या "रमेश को 100 उधार दिए"' : '"Tea 40 rupees" or "Paid 500 to Ramesh"'}
                   className="w-full bg-transparent border-0 p-0 text-stone-900 font-semibold text-base focus:ring-0 focus:outline-hidden placeholder:text-stone-400 placeholder:font-normal placeholder:italic"
                 />
               </div>
 
-              {/* Calculated Amount & Vendor Preview */}
+              {/* Calculated Amount & Vendor Preview Card */}
               {calculatedAmount !== null && (
-                <div className="rounded-2xl bg-emerald-50/90 border border-emerald-300 p-4 text-left space-y-3">
+                <div className={`rounded-2xl border p-4 text-left space-y-3 transition-colors ${
+                  txType === 'income'
+                    ? 'bg-emerald-50/90 border-emerald-300'
+                    : 'bg-amber-50/90 border-amber-300'
+                }`}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">
-                        {t('voice.calcTag')}
+                      <span className={`text-[11px] font-extrabold uppercase tracking-wide flex items-center gap-1 ${
+                        txType === 'income' ? 'text-emerald-800' : 'text-amber-900'
+                      }`}>
+                        <span>{txType === 'income' ? '● ' + t('voice.incomeLabel') : '● ' + t('voice.expenseLabel')}</span>
                       </span>
                       {breakdown && (
-                        <p className="text-xs font-medium text-emerald-700 mt-0.5">
+                        <p className={`text-xs font-medium mt-0.5 ${
+                          txType === 'income' ? 'text-emerald-700' : 'text-amber-800'
+                        }`}>
                           {breakdown}
                         </p>
                       )}
                     </div>
                     <div className="text-right">
-                      <span className="text-3xl font-black text-emerald-700 tracking-tight">
-                        + ₹{calculatedAmount.toFixed(2)}
+                      <span className={`text-3xl font-black tracking-tight ${
+                        txType === 'income' ? 'text-emerald-700' : 'text-amber-800'
+                      }`}>
+                        {txType === 'income' ? `+ ₹${calculatedAmount.toFixed(2)}` : `- ₹${calculatedAmount.toFixed(2)}`}
                       </span>
                     </div>
                   </div>
 
-                  {/* Editable Details: Payer & Amount */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60">
+                  {/* Editable Details: Payer/Receiver & Amount */}
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t ${
+                    txType === 'income' ? 'border-emerald-200/60' : 'border-amber-200/60'
+                  }`}>
                     <div>
-                      <label className="block text-[10px] font-bold text-emerald-900 uppercase">
-                        {t('voice.payerLabel')}
+                      <label className={`block text-[10px] font-bold uppercase ${
+                        txType === 'income' ? 'text-emerald-900' : 'text-amber-950'
+                      }`}>
+                        {txType === 'income' ? t('voice.payerLabelIncome') : t('voice.payerLabelExpense')}
                       </label>
                       <input
                         type="text"
                         value={vendorName}
                         onChange={e => setVendorName(e.target.value)}
-                        className="mt-0.5 w-full text-xs font-semibold px-2.5 py-1.5 bg-white rounded-lg border border-emerald-300 focus:outline-emerald-600 text-stone-800"
-                        placeholder="दुकान आवक"
+                        className={`mt-0.5 w-full text-xs font-semibold px-2.5 py-1.5 bg-white rounded-lg border focus:outline-hidden text-stone-800 ${
+                          txType === 'income' ? 'border-emerald-300 focus:border-emerald-600' : 'border-amber-300 focus:border-amber-600'
+                        }`}
+                        placeholder={txType === 'income' ? 'दुकान आवक' : 'पार्टी का नाम / खर्च'}
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-emerald-900 uppercase">
+                      <label className={`block text-[10px] font-bold uppercase ${
+                        txType === 'income' ? 'text-emerald-900' : 'text-amber-950'
+                      }`}>
                         {t('voice.amountLabel')}
                       </label>
                       <input
@@ -1289,7 +1360,9 @@ function VoiceAssistantModal({
                             handleSave()
                           }
                         }}
-                        className="mt-0.5 w-full text-xs font-bold px-2.5 py-1.5 bg-white rounded-lg border border-emerald-300 focus:outline-emerald-600 text-emerald-800"
+                        className={`mt-0.5 w-full text-xs font-black px-2.5 py-1.5 bg-white rounded-lg border focus:outline-hidden ${
+                          txType === 'income' ? 'border-emerald-300 text-emerald-800 focus:border-emerald-600' : 'border-amber-300 text-amber-900 focus:border-amber-600'
+                        }`}
                       />
                     </div>
                   </div>
@@ -1317,16 +1390,18 @@ function VoiceAssistantModal({
                   type="button"
                   onClick={handleSave}
                   disabled={submitting || !calculatedAmount || calculatedAmount <= 0}
-                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  className={`flex-1 py-3 px-4 rounded-xl text-white font-bold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 ${
+                    txType === 'income' ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-amber-700 hover:bg-amber-800'
+                  }`}
                 >
                   {submitting ? (
                     <span>{t('rv.saving')}</span>
                   ) : (
                     <>
-                      <PlusIcon className="w-4 h-4 stroke-[3]" />
-                      <span>{t('voice.stop')}</span>
+                      {txType === 'income' ? <PlusIcon className="w-4 h-4 stroke-[3]" /> : <ClockIcon className="w-4 h-4 stroke-[3]" />}
+                      <span>{txType === 'income' ? t('voice.saveIncome') : t('voice.saveExpense')}</span>
                       {calculatedAmount && calculatedAmount > 0 && (
-                        <span className="font-extrabold">(+₹{calculatedAmount})</span>
+                        <span className="font-extrabold">({txType === 'income' ? `+₹${calculatedAmount}` : `-₹${calculatedAmount}`})</span>
                       )}
                     </>
                   )}
@@ -1641,7 +1716,7 @@ function Upload({ onFileSelect }: { onFileSelect: (f: File) => void }){
 function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelectReceipt: (r: Receipt) => void; refreshKey: number }){
   const { t, lang } = useI18n()
   const p = new URLSearchParams(query)
-  const blank: Filters = { q: '', from: '', to: '', vendor: '' }
+  const blank: Filters = { q: '', from: '', to: '', vendor: '', type: undefined }
   const [fl, setFl] = useState<Filters>({ ...blank, vendor: p.get('vendor') || '' })
   const [ex, setEx] = useState<'idle' | 'busy' | 'ok' | 'err'>('idle')
 
@@ -1684,6 +1759,45 @@ function Ledger({ query, onSelectReceipt, refreshKey }: { query: string; onSelec
             <button className={`${ghost} text-xs py-1 px-3`} onClick={doExport}>{t('common.retry')}</button>
           </div>
         )}
+      </div>
+
+      {/* 3 Quick Ledger View Tabs: All, Money Added (+), Credited / Borrowed (-) */}
+      <div className="flex items-center gap-2 border-b border-stone-200 pb-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => up('type', '')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+            !fl.type
+              ? 'bg-stone-900 text-white shadow-xs'
+              : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
+          }`}
+        >
+          {t('lg.tabAll')}
+        </button>
+        <button
+          type="button"
+          onClick={() => up('type', 'income')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            fl.type === 'income'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
+          }`}
+        >
+          <WalletIcon className="w-4 h-4 shrink-0" />
+          <span>{t('lg.tabIncome')}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => up('type', 'expense')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            fl.type === 'expense'
+              ? 'bg-amber-700 text-white shadow-xs'
+              : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200/60'
+          }`}
+        >
+          <ClockIcon className="w-4 h-4 shrink-0" />
+          <span>{t('lg.tabExpense')}</span>
+        </button>
       </div>
 
       {/* Filter controls */}

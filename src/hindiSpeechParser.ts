@@ -226,12 +226,44 @@ export interface ParsedAudioResult {
   breakdown: string
   payer: string
   rawTranscript: string
+  type: 'income' | 'expense'
 }
 
-export function parseSpokenHindiAudio(text: string, defaultPayer = 'दुकान आवक'): ParsedAudioResult {
-  if (!text || !text.trim()) {
-    return { total: 0, breakdown: '', payer: defaultPayer, rawTranscript: text }
+export function detectSpokenTransactionType(text: string): 'income' | 'expense' {
+  if (!text) return 'income'
+  const s = text.toLowerCase()
+
+  // Explicit expense / udhar / credit given indicators (Hinglish, Hindi, Haryanvi, Bhojpuri)
+  // e.g. "ko diye", "diye", "diya", "de diye", "udhar", "baki", "credit", "gave", "given", "paid"
+  const expensePatterns = [
+    /\b(?:ko\s+diye|ko\s+diya|diye|diya|de\s+diye|de\s+diya|de\s+diyo|dediye|dediya|dya|deena|dega|gave|given|paid|pay\s+kiya|spent|kharch|kharcha|karcha|udhar|udhari|baki|baaki|credit|debit)\b/i,
+    /(?:को\s+दिए|को\s+दिया|दिए|दिया|दे\s+दिए|दे\s+दिया|देग्या|देगे|दे\s+गया|दे\s+गए|देलक|देहलक|देना\s+है|उधार|बाकी|क्रेडिट|डेबिट|खर्च|खर्चा|जावक|सामान\s+दिया)/
+  ]
+
+  // Explicit income / received / money added / jama indicators
+  // e.g. "se mile", "mile", "mila", "aagye", "aaye", "jama", "received", "got", "collected"
+  const incomePatterns = [
+    /\b(?:se\s+mile|se\s+mila|mile|mila|miley|milgaya|milgya|milge|aaye|aaya|aagye|aagya|ayale|received|got|collected|jama|deposit|inflow|added)\b/i,
+    /(?:से\s+मिले|से\s+मिला|मिले|मिला|मिल्या|मिलगे|मिलग्या|पागे|आया|आए|आये|आयगे|आग्ये|आगे|आयग्या|आग्या|आयले|जमा|जोड़\s+ले|जोड़\s+ले|चढ़ा\s+ले|धर\s+ले|आवक|रोकड़|नकद\s+आवक|प्राप्त|वसूल|पैसे\s+मिले)/
+  ]
+
+  for (const p of expensePatterns) {
+    if (p.test(s)) return 'expense'
   }
+  for (const p of incomePatterns) {
+    if (p.test(s)) return 'income'
+  }
+
+  return 'income'
+}
+
+export function parseSpokenHindiAudio(text: string, defaultPayer?: string): ParsedAudioResult {
+  if (!text || !text.trim()) {
+    return { total: 0, breakdown: '', payer: defaultPayer || 'दुकान आवक', rawTranscript: text, type: 'income' }
+  }
+
+  const detectedType = detectSpokenTransactionType(text)
+  const fallbackPayer = defaultPayer || (detectedType === 'income' ? 'दुकान आवक' : 'विविध खर्च')
 
   let converted = convertDevanagariDigits(text)
   converted = normalizeDialectWords(converted)
@@ -264,7 +296,7 @@ export function parseSpokenHindiAudio(text: string, defaultPayer = 'दुका
     }
   }
 
-  // Extract clean payer / customer name by stripping numbers, currency words & transaction verbs
+  // Extract clean payer / customer / contact name by stripping numbers, currency words & transaction verbs
   let payer = convertDevanagariDigits(text)
   payer = normalizeDialectWords(payer)
   payer = preprocessFractions(payer)
@@ -281,16 +313,31 @@ export function parseSpokenHindiAudio(text: string, defaultPayer = 'दुका
     payer = payer.replace(reg, ' ')
   }
 
-  // Dialect transaction verbs, prepositions & stop words (Haryanvi, Bhojpuri, Rajasthani, Hindi)
+  // Comprehensive dialect verbs, prepositions & stop words (Hinglish, Haryanvi, Bhojpuri, Rajasthani, Hindi, English)
   const stopWords =
-    /(?:^|\s+)(?:rupees|rupaye|rupay|rupai|रुपये|रुपए|रुपया|रुपै|रूपै|रिपिए|रपिए|रुपिया|रिपिया|टका|रु|रू|rs|inr|aur|and|plus|और|अर|अरु|गैल|तथा|जमा|का|की|के|से|सूं|ने|पै|पे|माँ|म्ह|भीतर|मिला|मिले|मिल्या|मिलगे|मिलग्या|पागे|आया|आए|आये|आयगे|आग्ये|आगे|आयग्या|आग्या|आयले|देग्या|देगे|दिए|दीया|दे\s+गया|दे\s+गए|देलक|देहलक|मिलल|आयल|आगिल|लिख\s+ले|लिख\s+दो|लिख\s+लेई|जोड़\s+ले|जोड़\s+दो|जोड़\s+दे|जोड़\s+ले|चढ़ा\s+ले|चढ़ा\s+दे|धर\s+दे|धर\s+ले|खाता|खाते|गल्ला|गल्ले|दुकान|cash|नकद|नगद|नगदी|रोकड़|रोकड़ा|पेमेंट|payment)(?=[\s,.:;!?()]|$|[^\u0900-\u097Fa-zA-Z0-9])/gi
+    /(?:^|\s+)(?:rupees|rupaye|rupay|rupai|रुपये|रुपए|रुपया|रुपै|रूपै|रिपिए|रपिए|रुपिया|रिपिया|टका|रु|रू|rs|inr|aur|and|plus|और|अर|अरु|गैल|तथा|जमा|का|की|के|से|सूं|ने|पै|पे|माँ|म्ह|भीतर|को|ko|se|ne|par|pe|ka|ki|ke|diye|diya|de|dediye|dediya|dya|mile|mila|miley|mil|aaye|aaya|aagye|aagya|mujhe|mujhko|humko|hame|humein|maine|usne|isko|usko|apne|gave|given|paid|pay|received|got|collected|credit|debit|udhar|udhari|baki|baaki|मिला|मिले|मिल्या|मिलगे|मिलग्या|पागे|आया|आए|आये|आयगे|आग्ये|आगे|आयग्या|आग्या|आयले|देग्या|देगे|दिए|दीया|दे\s+गया|दे\s+गए|देलक|देहलक|दे\s+दिए|दे\s+दिया|देना\s+है|उधार|बाकी|क्रेडिट|डेबिट|लिख\s+ले|लिख\s+दो|लिख\s+लेई|जोड़\s+ले|जोड़\s+दो|जोड़\s+दे|जोड़\s+ले|चढ़ा\s+ले|चढ़ा\s+दे|धर\s+दे|धर\s+ले|खाता|खाते|गल्ला|गल्ले|दुकान|cash|नकद|नगद|नगदी|रोकड़|रोकड़ा|पेमेंट|payment|खर्च|खर्चा|जावक)(?=[\s,.:;!?()]|$|[^\u0900-\u097Fa-zA-Z0-9])/gi
 
   payer = payer.replace(stopWords, ' ').replace(stopWords, ' ').replace(stopWords, ' ').replace(/\s+/g, ' ').trim()
+
+  // Clean trailing punctuation or single letters
+  payer = payer.replace(/^[-–—,.:;!?/\s]+|[-–—,.:;!?/\s]+$/g, '').trim()
+
+  // Capitalize first letter of each Latin word (e.g. "ramesh" -> "Ramesh")
+  if (/^[a-zA-Z\s]+$/.test(payer) && payer.length > 0) {
+    payer = payer.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+  }
+
+  // Filter out reflexive pronouns if still left
+  const lowerP = payer.toLowerCase()
+  if (lowerP === 'mujhe' || lowerP === 'mujhko' || lowerP === 'humko' || lowerP === 'maine' || lowerP === 'self' || lowerP === 'me' || lowerP === 'dokan' || lowerP === 'dukan') {
+    payer = ''
+  }
 
   return {
     total: grandTotal,
     breakdown: itemParts.length > 1 ? itemParts.join(' + ') : (itemParts[0] || ''),
-    payer: payer.length > 1 ? payer : defaultPayer,
-    rawTranscript: text
+    payer: payer.length > 1 ? payer : fallbackPayer,
+    rawTranscript: text,
+    type: detectedType
   }
 }

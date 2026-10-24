@@ -54,7 +54,9 @@ class ReceiptUpdatePayload(BaseModel):
 class VoiceQuickEntryPayload(BaseModel):
     spoken_text: str
     amount: float
-    vendor: Optional[str] = "Quick Expense"
+    vendor: Optional[str] = "Voice Quick Entry"
     category: Optional[str] = "other"
+    type: Optional[str] = "income"
+    transaction_type: Optional[str] = None
     data: Optional[str] = None
 

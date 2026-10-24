@@ -102,9 +102,11 @@ export const m={
   discard:(id:string)=>{db=db.filter(r=>r.id!==id)},
   deleteReceipt:(id:string)=>{db=db.filter(r=>r.id!==id)},
   keep:(id:string)=>put(id,{status:'draft',duplicateOfId:undefined}),
-  voiceQuickEntry:(p:{spoken_text:string;amount:number;vendor?:string;category?:string;data?:string})=>{
+  voiceQuickEntry:(p:{spoken_text:string;amount:number;vendor?:string;category?:string;data?:string;type?:'income'|'expense';transaction_type?:'income'|'expense'})=>{
     const id='r'+(db.length+1)
-    const r=mk(id,p.vendor||'Voice Added Money',new Date().toISOString().slice(0,10),p.category||'other',p.amount,'confirmed',[{name:p.spoken_text,amount:p.amount}],'income',{data:p.data||p.spoken_text})
+    const txType = p.transaction_type || p.type || 'income'
+    const defaultVendor = txType === 'income' ? 'Voice Added Money' : 'Voice Udhar / Expense'
+    const r=mk(id,p.vendor||defaultVendor,new Date().toISOString().slice(0,10),p.category||'other',p.amount,'confirmed',[{name:p.spoken_text,amount:p.amount}],txType,{data:p.data||p.spoken_text})
     db=[r,...db]
     return r
   },

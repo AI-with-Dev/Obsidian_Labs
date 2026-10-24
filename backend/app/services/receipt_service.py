@@ -529,6 +529,7 @@ def list_receipts(
     vendor: Optional[str] = None,
     status_filter: Optional[str] = None,
     owner_id: int = 1,
+    transaction_type: Optional[str] = None,
 ) -> list:
     """List receipts matching search and filter parameters."""
     query = "SELECT id FROM receipts WHERE owner_id = ? AND status != 'discarded_duplicate'"
@@ -539,6 +540,10 @@ def list_receipts(
         query += " AND status = 'confirmed'"
     elif status_filter == "pending":
         query += " AND status NOT IN ('confirmed', 'discarded_duplicate', 'extraction_failed')"
+
+    if transaction_type:
+        query += " AND (transaction_type = ? OR type = ?)"
+        params.extend([transaction_type, transaction_type])
 
     if category:
         query += " AND category = ?"
@@ -901,16 +906,21 @@ def keep_separate(receipt_id: str, owner_id: int = 1) -> dict:
 
 
 def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> dict:
-    """Create a confirmed income entry from voice audio input."""
+    """Create a confirmed income or credit/udhar entry from voice audio input."""
     if payload.amount <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Amount must be greater than 0.",
         )
 
+    raw_type = (payload.transaction_type or payload.type or "income").lower().strip()
+    is_income = raw_type not in {"expense", "borrowed", "credit", "udhar", "debit"}
+    txn_type = "income" if is_income else "expense"
+
     amount_paise = int(round(Decimal(str(payload.amount)) * 100))
     receipt_id = f"rec_voice_{uuid.uuid4().hex[:12]}"
-    vendor_name = (payload.vendor or "").strip() or "Voice Added Money"
+    default_vendor = "दुकान आवक" if is_income else "उधार / क्रेडिट"
+    vendor_name = (payload.vendor or "").strip() or default_vendor
     spoken_data = (payload.data or f"Spoken: {payload.spoken_text}").strip()
     category = payload.category if payload.category in ALLOWED_CONFIRM_CATEGORIES else "other"
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -919,7 +929,9 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
     # Generate an SVG voucher file for disk retrieval
     voucher_filename = f"{receipt_id}_voice_voucher.svg"
     voucher_path = settings.upload_dir_resolved / voucher_filename
-    svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+
+    if is_income:
+        svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
   <rect width="400" height="400" fill="#FFFDF8" stroke="#059669" stroke-width="3" rx="12"/>
   <rect x="0" y="0" width="400" height="60" fill="#064E3B"/>
   <text x="200" y="38" font-size="18" font-family="sans-serif" font-weight="bold" fill="#ECFDF5" text-anchor="middle">VOICE MONEY ADDED VOUCHER</text>
@@ -929,9 +941,24 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
   <text x="30" y="210" font-size="16" font-family="sans-serif" fill="#6B7280">Voice Audio Data:</text>
   <text x="30" y="235" font-size="14" font-family="sans-serif" fill="#064E3B" font-style="italic">{payload.spoken_text[:40]}</text>
   <line x1="30" y1="260" x2="370" y2="260" stroke="#E5E7EB" stroke-width="2"/>
-  <text x="30" y="300" font-size="16" font-family="sans-serif" fill="#6B7280">Total Added:</text>
+  <text x="30" y="300" font-size="16" font-family="sans-serif" fill="#6B7280">Total Added (जमा):</text>
   <text x="30" y="340" font-size="32" font-family="sans-serif" font-weight="extrabold" fill="#059669">+ INR {payload.amount:.2f}</text>
 </svg>"""
+    else:
+        svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+  <rect width="400" height="400" fill="#FFFDF8" stroke="#D97706" stroke-width="3" rx="12"/>
+  <rect x="0" y="0" width="400" height="60" fill="#78350F"/>
+  <text x="200" y="38" font-size="18" font-family="sans-serif" font-weight="bold" fill="#FEF3C7" text-anchor="middle">VOICE CREDIT / UDHAR VOUCHER</text>
+  <text x="30" y="110" font-size="16" font-family="sans-serif" fill="#6B7280">Receiver / Party:</text>
+  <text x="30" y="135" font-size="20" font-family="sans-serif" font-weight="bold" fill="#111827">{vendor_name}</text>
+  <text x="30" y="180" font-size="16" font-family="sans-serif" fill="#6B7280">Date: {today_str}</text>
+  <text x="30" y="210" font-size="16" font-family="sans-serif" fill="#6B7280">Voice Audio Data:</text>
+  <text x="30" y="235" font-size="14" font-family="sans-serif" fill="#92400E" font-style="italic">{payload.spoken_text[:40]}</text>
+  <line x1="30" y1="260" x2="370" y2="260" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="30" y="300" font-size="16" font-family="sans-serif" fill="#6B7280">Total Credited / Udhar (उधार):</text>
+  <text x="30" y="340" font-size="32" font-family="sans-serif" font-weight="extrabold" fill="#B45309">- INR {payload.amount:.2f}</text>
+</svg>"""
+
     voucher_path.write_text(svg_content, encoding="utf-8")
     file_hash = hashlib.sha256(svg_content.encode("utf-8")).hexdigest()
 
@@ -942,7 +969,7 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
                 id, owner_id, file_path, file_name, file_hash, mime_type, vendor,
                 receipt_date, currency, total_paise, category, transaction_type, type, status,
                 flags_json, data, notes, confirmed_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'INR', ?, ?, 'income', 'income', 'confirmed', '[]', ?, ?, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'INR', ?, ?, ?, ?, 'confirmed', '[]', ?, ?, ?, ?);
             """,
             (
                 receipt_id,
@@ -955,20 +982,23 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
                 today_str,
                 amount_paise,
                 category,
+                txn_type,
+                txn_type,
                 spoken_data,
-                f"Voice Quick Entry: {payload.spoken_text}",
+                f"Voice Quick Entry ({'Income' if is_income else 'Credit/Udhar'}): {payload.spoken_text}",
                 now_ts,
                 now_ts,
             ),
         )
 
         # Insert line item
+        desc = payload.spoken_text or ("Voice added money item" if is_income else "Voice credit/udhar item")
         conn.execute(
             """
             INSERT INTO receipt_items (receipt_id, item_order, description, quantity, line_total_paise, unit_price_paise)
             VALUES (?, 1, ?, 1.0, ?, ?);
             """,
-            (receipt_id, payload.spoken_text or "Voice added money item", amount_paise, amount_paise),
+            (receipt_id, desc, amount_paise, amount_paise),
         )
 
         # Audit event
@@ -977,7 +1007,13 @@ def create_voice_quick_entry(payload: VoiceQuickEntryPayload, owner_id: int) -> 
             INSERT INTO receipt_events (receipt_id, event_type, details_json)
             VALUES (?, 'VOICE_QUICK_ENTRY', ?);
             """,
-            (receipt_id, json.dumps({"spoken_text": payload.spoken_text, "amount": payload.amount, "data": spoken_data})),
+            (receipt_id, json.dumps({
+                "spoken_text": payload.spoken_text,
+                "amount": payload.amount,
+                "transaction_type": txn_type,
+                "data": spoken_data,
+            })),
         )
 
     return get_receipt_details(receipt_id, owner_id)
+

@@ -87,6 +87,7 @@ async def list_all_receipts(
     category: Optional[str] = None,
     vendor: Optional[str] = None,
     status: Optional[str] = None,
+    type: Optional[str] = None,
 ):
     """List and filter receipts for ledger and dashboard views."""
     data = list_receipts(
@@ -97,6 +98,7 @@ async def list_all_receipts(
         category=category,
         vendor=vendor,
         status_filter=status,
+        transaction_type=type,
     )
     return ApiResponse.ok(data)
 

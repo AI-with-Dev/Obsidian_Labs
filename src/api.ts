@@ -69,7 +69,7 @@ export const confirm=(id:string)=>call<Receipt>(`/api/receipts/${id}/confirm`,js
 export const discard=(id:string)=>call<void>(`/api/receipts/${id}/discard-duplicate`,json('POST'),()=>m.discard(id))
 export const deleteReceipt=(id:string)=>call<void>(`/api/receipts/${id}`,json('DELETE'),()=>m.deleteReceipt(id))
 export const keepSeparate=(id:string)=>call<Receipt>(`/api/receipts/${id}/keep-separate`,json('POST'),()=>m.keep(id))
-export const voiceQuickEntry=(payload:{spoken_text:string;amount:number;vendor?:string;category?:string;data?:string})=>
+export const voiceQuickEntry=(payload:{spoken_text:string;amount:number;vendor?:string;category?:string;data?:string;type?:'income'|'expense';transaction_type?:'income'|'expense'})=>
   call<Receipt>('/api/receipts/voice-quick-entry',json('POST',payload),()=>m.voiceQuickEntry(payload))
 export const list=(f:Filters={})=>call<Receipt[]>('/api/receipts?'+new URLSearchParams(Object.entries(f).filter(([,v])=>v) as [string,string][]),undefined,()=>m.list(f))
 export const summary=()=>call<Summary>('/api/dashboard/summary',undefined,()=>m.summary())
