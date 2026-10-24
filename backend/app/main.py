@@ -97,6 +97,22 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 # Health Check Endpoint
+@app.get("/")
+async def root_health_check():
+    """Respond to hosting platforms that probe the application root."""
+    return {
+        "status": "ok",
+        "service": "Vyapar Mitra API",
+        "frontend": "hosted separately",
+    }
+
+
+@app.get("/script-health-check")
+async def streamlit_script_health_check():
+    """Respond to Streamlit Community Cloud's script health probe."""
+    return {"status": "ok"}
+
+
 @app.get("/api/health", response_model=ApiResponse[dict])
 async def health_check():
     """Verify backend and database health."""

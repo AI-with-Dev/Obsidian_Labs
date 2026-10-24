@@ -106,7 +106,7 @@ The backend API server runs at [http://localhost:8000](http://localhost:8000). I
 
 ### Streamlit Community Cloud (FastAPI backend)
 
-To host the FastAPI API on Streamlit Community Cloud, set **Main file path** to `main.py` in the repository root. This root-level ASGI entry point exposes the backend app; it does not host the React/Vite frontend, which must still be deployed separately. Configure `GEMINI_API_KEY` in Streamlit's app secrets/environment settings if receipt extraction is needed.
+To host the FastAPI API on Streamlit Community Cloud, set **Main file path** to `main.py` in the repository root. This root-level ASGI entry point exposes the backend app and responds to Streamlit's root and script health probes; it does not host the React/Vite frontend, which must still be deployed separately. Configure `GEMINI_API_KEY` in Streamlit's app secrets/environment settings if receipt extraction is needed.
 
 ### First sign-in
 
