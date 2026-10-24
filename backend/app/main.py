@@ -182,17 +182,17 @@ async def export_payments_pdf():
             r["total_paise"] or 0 for r in rows if r["transaction_type"] == "expense"
         ) / 100.0
 
-        stream = "BT /F1 16 Tf 50 780 Td (Vyapar Mitra - Official Payment & Collections Summary) Tj\n"
-        stream += f"/F2 10 Tf 0 -22 Td (Export Format: Official PDF | Total Records: {len(rows)}) Tj\n"
+        stream = "BT /F1 16 Tf 50 780 Td (Vyapar Mitra - Official Ledger Summary) Tj\n"
+        stream += f"/F2 10 Tf 0 -22 Td (Export Format: Official PDF | Total Entries: {len(rows)}) Tj\n"
         stream += f"/F1 12 Tf 0 -24 Td (TOTAL MONEY RECEIVED: (+) INR {total_received:,.2f}) Tj\n"
-        stream += f"/F1 10 Tf 0 -18 Td (TOTAL MONEY GIVEN: (-) INR {total_spent:,.2f}) Tj\n"
-        stream += "/F1 10 Tf 0 -28 Td (Date         Type      Customer / Vendor                 Amount) Tj\n"
+        stream += f"/F1 10 Tf 0 -18 Td (TOTAL ACTIVE CREDIT / BORROWED: (Udhar) INR {total_spent:,.2f}) Tj\n"
+        stream += "/F1 10 Tf 0 -28 Td (Date         Type      Customer / Party                  Amount) Tj\n"
         stream += "/F2 9 Tf 0 -5 Td (--------------------------------------------------------------------------------) Tj\n"
 
         for r in rows[:30]:
             d = (r["receipt_date"] or "----").ljust(12)
             transaction_type = r["transaction_type"]
-            label = "Received" if transaction_type == "income" else "Expense"
+            label = "Received" if transaction_type == "income" else "Borrowed"
             sign = "+" if transaction_type == "income" else "-"
             name = (r["vendor"] or "Unknown")[:32].ljust(34)
             amt = f"({sign}) INR {(r['total_paise'] or 0)/100.0:,.2f}"

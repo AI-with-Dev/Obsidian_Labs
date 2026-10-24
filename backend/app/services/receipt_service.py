@@ -352,12 +352,40 @@ async def perform_receipt_extraction(receipt_id: str, owner_business_name: str =
         raise
 
     firm_name = (extraction.firm_name or "").strip()
-    is_income = receipt_matches_owner_business(firm_name, owner_business_name)
+    party_name = (getattr(extraction, "party_name", None) or "").strip()
     customer_name = (extraction.customer_name or "").strip()
-    vendor_name = customer_name if is_income else (firm_name or extraction.vendor or "").strip()
+
+    # Determine transaction type:
+    if extraction.transaction_type:
+        txn_str = extraction.transaction_type.lower()
+        if txn_str in {"income", "received", "jama", "deposit"}:
+            is_income = True
+        elif txn_str in {"expense", "borrowed", "credit", "udhar"}:
+            is_income = False
+        else:
+            is_income = receipt_matches_owner_business(firm_name, owner_business_name)
+    else:
+        is_income = receipt_matches_owner_business(firm_name, owner_business_name)
+
+    # Resolve party/person name:
+    if is_income:
+        vendor_name = (customer_name or party_name or extraction.vendor or firm_name or "").strip()
+    else:
+        vendor_name = (firm_name or extraction.vendor or party_name or customer_name or "").strip()
+
     flags = list(extraction.uncertainty_flags)
-    if is_income and not customer_name and "vendor" not in flags:
-        flags.append("vendor")
+    if vendor_name:
+        if "vendor" in flags:
+            flags.remove("vendor")
+    else:
+        if "vendor" not in flags:
+            flags.append("vendor")
+
+    # If informal note had total but no line items (e.g. "Suresh bhai 500 jama" or "Ramesh 20 rupay"):
+    if not extraction.items and extraction.total and extraction.total > 0:
+        from backend.app.services.gemini_service import ExtractedLineItem
+        desc = "Cash Received / Jama" if is_income else "Borrowed Goods / Udhar"
+        extraction.items.append(ExtractedLineItem(name=desc, amount=extraction.total))
 
     # Convert total to integer paise
     total_paise: Optional[int] = None
@@ -544,7 +572,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
     """Save owner corrections and draft edits for an existing receipt."""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id, status, flags_json FROM receipts WHERE id = ?;",
+            "SELECT id, status, flags_json, category, transaction_type FROM receipts WHERE id = ?;",
             (receipt_id,),
         ).fetchone()
 
@@ -607,6 +635,15 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
             except Exception:
                 discount_paise = None
 
+        new_txn_type = None
+        raw_txn = payload.type or payload.transactionType
+        if raw_txn:
+            rt = raw_txn.strip().lower()
+            if rt in {"income", "received", "jama", "deposit"}:
+                new_txn_type = "income"
+            elif rt in {"expense", "borrowed", "credit", "udhar"}:
+                new_txn_type = "expense"
+
         # Update receipt record
         conn.execute(
             """
@@ -616,6 +653,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 currency = ?,
                 total_paise = ?,
                 category = ?,
+                transaction_type = COALESCE(?, transaction_type),
                 invoice_number = COALESCE(?, invoice_number),
                 tax_paise = COALESCE(?, tax_paise),
                 discount_paise = COALESCE(?, discount_paise),
@@ -631,6 +669,7 @@ def save_receipt_draft(receipt_id: str, payload: ReceiptUpdatePayload) -> dict:
                 currency,
                 total_paise,
                 category,
+                new_txn_type,
                 invoice_number,
                 tax_paise,
                 discount_paise,
